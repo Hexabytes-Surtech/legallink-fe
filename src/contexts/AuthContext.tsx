@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiClient } from '@/lib/api';
+import { apiClient } from '@/lib/api/client';
 
 interface User {
   userId: string;
@@ -25,7 +25,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // On mount: restore from localStorage and try to refresh
   useEffect(() => {
     const restoreSession = async () => {
       const storedToken = localStorage.getItem('ll_access_token');
@@ -36,7 +35,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           setAccessToken(storedToken);
           setUser(JSON.parse(storedUser));
-          // Try silent refresh
           if (storedRefresh) {
             const res = await apiClient<{ accessToken: string; refreshToken: string }>(
               '/auth/refresh',
@@ -50,7 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } catch {
-          // Refresh failed: clear session
           clearSession();
         }
       }

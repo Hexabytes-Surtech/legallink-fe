@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
+import { apiClient } from '@/lib/api/client';
 
 interface OTPModalProps {
   onClose: () => void;
   onSuccess?: () => void;
-  /** If provided, after auth the modal will redirect here */
   redirectTo?: string;
-  /** Advocacy-specific context (e.g., advocate name for "request consultation") */
   contextMessage?: string;
 }
 
@@ -31,7 +29,6 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start resend countdown
   const startCountdown = useCallback(() => {
     setResendCountdown(30);
     if (countdownRef.current) clearInterval(countdownRef.current);
@@ -50,7 +47,6 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
     if (countdownRef.current) clearInterval(countdownRef.current);
   }, []);
 
-  // Request OTP
   async function handleRequestOtp(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -74,14 +70,12 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
     }
   }
 
-  // Handle OTP digit input
   function handleOtpChange(index: number, value: string) {
     if (!/^\d*$/.test(value)) return;
     const next = [...otp];
     next[index] = value.slice(-1);
     setOtp(next);
     if (value && index < 5) otpRefs.current[index + 1]?.focus();
-    // Auto-submit when all filled
     if (value && next.every(d => d !== '') && index === 5) {
       verifyOtp(next.join(''));
     }
@@ -304,7 +298,6 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
 
       <div className="otp-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
         <div className="otp-modal">
-          {/* Header */}
           <div className="otp-modal-header">
             <button className="otp-modal-close" onClick={onClose} aria-label="Close">×</button>
             <div className="otp-modal-step-indicator">
@@ -321,7 +314,6 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
             </div>
           </div>
 
-          {/* Body */}
           <div className="otp-modal-body">
             {contextMessage && (
               <div className="otp-context">{contextMessage}</div>

@@ -5,15 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { apiClient } from '@/lib/api/client';
+import { LanguageToggle } from '@/components/features/LanguageToggle';
 
 function SignupContent() {
   const { t, language } = useLanguage();
   const { isAuthenticated, login } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo') ?? '/app/matters';
+  const returnTo = searchParams.get('returnTo') ?? '/matters';
 
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState('');
@@ -24,9 +24,8 @@ function SignupContent() {
 
   useEffect(() => {
     if (isAuthenticated) router.replace(returnTo);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router, returnTo]);
 
-  // Resend countdown
   useEffect(() => {
     if (resendCountdown <= 0) return;
     const timer = setTimeout(() => setResendCountdown(c => c - 1), 1000);
@@ -99,7 +98,6 @@ function SignupContent() {
       overflow: 'hidden',
       padding: '2rem 1rem',
     }}>
-      {/* Background pattern */}
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `radial-gradient(circle at 30% 40%, rgba(201,168,76,0.08) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(30,50,73,0.8) 0%, transparent 50%)`,
@@ -107,7 +105,6 @@ function SignupContent() {
       }} />
 
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '440px' }}>
-        {/* Back link */}
         <Link href="/" style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -121,7 +118,6 @@ function SignupContent() {
           ← {language === 'en' ? 'Back to LegalLink' : 'লিগ্যাললিংকে ফিরুন'}
         </Link>
 
-        {/* Card */}
         <div style={{
           background: 'white',
           borderRadius: '1.5rem',
@@ -129,19 +125,16 @@ function SignupContent() {
           boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
           animation: 'fadeInScale 0.3s ease',
         }}>
-          {/* Header */}
           <div style={{
             background: 'linear-gradient(135deg, #0D1B2A, #1E3249)',
             padding: '2.5rem 2rem 2rem',
           }}>
-            {/* Logo */}
             <div style={{ marginBottom: '1.5rem' }}>
               <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'white' }}>
                 Legal<span style={{ color: '#C9A84C' }}>Link</span>
               </span>
             </div>
 
-            {/* Step dots */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '1.25rem' }}>
               {['email', 'otp'].map((s, i) => (
                 <div key={s} style={{
@@ -154,43 +147,21 @@ function SignupContent() {
               ))}
             </div>
 
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: 700,
-              color: 'white',
-              fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-            }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
               {step === 'email' ? t('auth.step1.title') : t('auth.step2.title')}
             </h1>
-            <p style={{
-              color: 'rgba(255,255,255,0.55)',
-              fontSize: '0.9rem',
-              marginTop: '0.375rem',
-              fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-            }}>
-              {step === 'email'
-                ? t('auth.subtitle')
-                : `${t('auth.step2.subtitle')} ${email}`}
+            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.9rem', marginTop: '0.375rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+              {step === 'email' ? t('auth.subtitle') : `${t('auth.step2.subtitle')} ${email}`}
             </p>
           </div>
 
-          {/* Body */}
           <div style={{ padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
               <LanguageToggle variant="page" />
             </div>
 
             {error && (
-              <div style={{
-                background: 'rgba(239,68,68,0.08)',
-                border: '1px solid rgba(239,68,68,0.2)',
-                borderRadius: '0.625rem',
-                padding: '0.75rem 1rem',
-                color: '#DC2626',
-                fontSize: '0.875rem',
-                marginBottom: '1.25rem',
-                fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-              }}>
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.625rem', padding: '0.75rem 1rem', color: '#DC2626', fontSize: '0.875rem', marginBottom: '1.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
                 {error}
               </div>
             )}
@@ -198,93 +169,34 @@ function SignupContent() {
             {step === 'email' ? (
               <form onSubmit={handleRequestOtp}>
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label htmlFor="auth-email" style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                    fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-                  }}>
+                  <label htmlFor="auth-email" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
                     {t('auth.step1.label')}
                   </label>
-                  <input
-                    id="auth-email"
-                    className="input"
-                    type="email"
-                    placeholder={t('auth.step1.placeholder')}
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    autoFocus
-                    required
-                    style={{ fontSize: '1.0625rem' }}
-                  />
+                  <input id="auth-email" className="input" type="email" placeholder={t('auth.step1.placeholder')} value={email} onChange={e => setEmail(e.target.value)} autoFocus required style={{ fontSize: '1.0625rem' }} />
                 </div>
-                <button
-                  type="submit"
-                  id="auth-request-otp"
-                  className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-                  disabled={loading}
-                >
+                <button type="submit" id="auth-request-otp" className="btn btn-primary" style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }} disabled={loading}>
                   {loading ? t('auth.step1.sending') : t('auth.step1.submit')}
                 </button>
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp}>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label htmlFor="auth-otp" style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '0.5rem',
-                    fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-                  }}>
+                  <label htmlFor="auth-otp" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
                     {language === 'en' ? '6-digit verification code' : '৬ সংখ্যার কোড'}
                   </label>
-                  <input
-                    id="auth-otp"
-                    className="input"
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="000000"
-                    value={otp}
-                    onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    autoFocus
-                    style={{ fontSize: '1.5rem', letterSpacing: '0.2em', textAlign: 'center', fontFamily: 'monospace' }}
-                  />
+                  <input id="auth-otp" className="input" type="text" inputMode="numeric" maxLength={6} placeholder="000000" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} autoFocus style={{ fontSize: '1.5rem', letterSpacing: '0.2em', textAlign: 'center', fontFamily: 'monospace' }} />
                 </div>
-                <button
-                  type="submit"
-                  id="auth-verify-otp"
-                  className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-                  disabled={loading || otp.length < 6}
-                >
+                <button type="submit" id="auth-verify-otp" className="btn btn-primary" style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }} disabled={loading || otp.length < 6}>
                   {loading ? t('auth.step2.verifying') : t('auth.step2.submit')}
                 </button>
                 <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem', color: '#6B7280' }}>
                   {resendCountdown > 0 ? (
-                    <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-                      {t('auth.step2.resend.wait')} {resendCountdown}s
-                    </span>
+                    <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>{t('auth.step2.resend.wait')} {resendCountdown}s</span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={handleResend}
-                      style={{ background: 'none', border: 'none', color: '#C9A84C', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-                    >
-                      {t('auth.step2.resend')}
-                    </button>
+                    <button type="button" onClick={handleResend} style={{ background: 'none', border: 'none', color: '#C9A84C', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>{t('auth.step2.resend')}</button>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setStep('email'); setError(''); setOtp(''); }}
-                  style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.875rem', cursor: 'pointer', marginTop: '0.75rem', display: 'block', width: '100%', textAlign: 'center' }}
-                >
+                <button type="button" onClick={() => { setStep('email'); setError(''); setOtp(''); }} style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '0.875rem', cursor: 'pointer', marginTop: '0.75rem', display: 'block', width: '100%', textAlign: 'center' }}>
                   ← {language === 'en' ? 'Use a different email' : 'অন্য ইমেইল ব্যবহার করুন'}
                 </button>
               </form>

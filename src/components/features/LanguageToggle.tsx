@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { Language } from '@/lib/translations';
+import type { Language } from '@/i18n/config';
 
 interface LanguageToggleProps {
   variant?: 'navbar' | 'page' | 'mobile';

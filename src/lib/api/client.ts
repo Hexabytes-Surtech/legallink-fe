@@ -1,11 +1,7 @@
 /**
  * LegalLink API Client
- * ---
  * Handles: base URL injection, auth header, response envelope unwrapping,
  * and typed error surfacing.
- *
- * Backend envelope format:
- *   { success: boolean, data: T, meta?: {...} }
  */
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
@@ -21,9 +17,7 @@ export interface ApiResponse<T> {
 interface RequestOptions<B = unknown> {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: B;
-  /** If true, skip injecting the Authorization header */
   skipAuth?: boolean;
-  /** For multipart uploads */
   formData?: FormData;
 }
 
@@ -54,7 +48,6 @@ export async function apiClient<T = unknown, B = unknown>(
 
   if (formData) {
     init.body = formData;
-    // Remove Content-Type header for multipart (browser sets it with boundary)
     delete headers['Content-Type'];
   } else if (body !== undefined) {
     init.body = JSON.stringify(body);
@@ -73,12 +66,10 @@ export async function apiClient<T = unknown, B = unknown>(
       };
     }
 
-    // NestJS ResponseEnvelopeInterceptor wraps all responses
     if ('success' in json && 'data' in json) {
       return json as ApiResponse<T>;
     }
 
-    // Fallback: raw response (e.g. swagger health)
     return { success: true, data: json as T };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Network error';

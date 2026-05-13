@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { LanguageToggle } from './LanguageToggle';
+import { LanguageToggle } from '@/components/features/LanguageToggle';
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -13,7 +13,6 @@ export function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -173,7 +172,6 @@ export function Navbar() {
       `}</style>
 
       <div className="navbar-inner">
-        {/* Logo */}
         <Link href="/" className="navbar-logo">
           <div className="navbar-logo-icon">L</div>
           <div>
@@ -182,12 +180,10 @@ export function Navbar() {
           </div>
         </Link>
 
-        {/* Center nav items — desktop */}
         <div className="navbar-center">
           <LanguageToggle variant="navbar" />
         </div>
 
-        {/* Right — desktop */}
         <div className="navbar-right desktop-auth">
           {isAuthenticated ? (
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -202,7 +198,7 @@ export function Navbar() {
               {dropdownOpen && (
                 <div className="user-dropdown">
                   <div className="user-dropdown-email">{user?.email}</div>
-                  <Link href="/app/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                  <Link href="/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
                     {t('nav.myMatters')}
                   </Link>
                   <button
@@ -227,7 +223,6 @@ export function Navbar() {
           )}
         </div>
 
-        {/* Hamburger — mobile */}
         <button
           className="hamburger"
           onClick={() => setMenuOpen(p => !p)}
@@ -239,12 +234,11 @@ export function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu */}
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
         <LanguageToggle variant="mobile" />
         {isAuthenticated ? (
           <>
-            <Link href="/app/matters" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
+            <Link href="/matters" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
               {t('nav.myMatters')}
             </Link>
             <button className="btn btn-ghost" onClick={() => { logout(); setMenuOpen(false); }}>

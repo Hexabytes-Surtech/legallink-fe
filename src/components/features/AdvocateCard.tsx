@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { Advocate } from '@/lib/mock-data';
+import type { Advocate } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface AdvocateCardProps {
@@ -146,7 +146,6 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
         }
       `}</style>
       <div className="advocate-card">
-        {/* Header */}
         <div className="advocate-card-header">
           <div className="advocate-avatar">{initials}</div>
           <div className="advocate-name-block">
@@ -163,9 +162,7 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           )}
         </div>
 
-        {/* Body */}
         <div className="advocate-card-body">
-          {/* Practice areas */}
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.practiceAreas')}</div>
             <div className="advocate-tags">
@@ -177,7 +174,6 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
             </div>
           </div>
 
-          {/* Languages */}
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.languages')}</div>
             <div className="advocate-tags">
@@ -189,7 +185,6 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
             </div>
           </div>
 
-          {/* Districts */}
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.districts')}</div>
             <div className="advocate-courts">
@@ -198,7 +193,6 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           </div>
         </div>
 
-        {/* Footer / CTA */}
         <div className="advocate-card-footer">
           <button
             className="btn btn-primary"
