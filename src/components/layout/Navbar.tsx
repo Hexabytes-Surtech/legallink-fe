@@ -6,7 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/features/LanguageToggle';
 
-export function Navbar() {
+interface NavbarProps {
+  variant?: 'dark' | 'editorial';
+}
+
+export function Navbar({ variant = 'dark' }: NavbarProps) {
   const { user, isAuthenticated, logout } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -24,7 +28,7 @@ export function Navbar() {
   }, []);
 
   return (
-    <header className="navbar">
+    <header className={`navbar navbar-${variant}`}>
       <style>{`
         .navbar {
           position: sticky;
@@ -34,6 +38,10 @@ export function Navbar() {
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           border-bottom: 1px solid rgba(201,168,76,0.15);
+        }
+        .navbar-editorial {
+          background: rgba(246,240,230,0.92);
+          border-bottom: 1px solid rgba(23,33,28,0.12);
         }
         .navbar-inner {
           display: flex;
@@ -62,14 +70,26 @@ export function Navbar() {
           font-weight: 800;
           color: #0D1B2A;
         }
+        .navbar-editorial .navbar-logo-icon {
+          background: #17211c;
+          color: #fffaf1;
+          border-radius: 0.25rem;
+        }
         .navbar-logo-text {
           font-size: 1.125rem;
           font-weight: 700;
           color: #FFFFFF;
           letter-spacing: -0.02em;
         }
+        .navbar-editorial .navbar-logo-text {
+          color: #17211c;
+          letter-spacing: 0;
+        }
         .navbar-logo-text span {
           color: #C9A84C;
+        }
+        .navbar-editorial .navbar-logo-text span {
+          color: #8f2638;
         }
         .navbar-tagline {
           font-size: 0.65rem;
@@ -78,6 +98,10 @@ export function Navbar() {
           letter-spacing: 0.06em;
           text-transform: uppercase;
           margin-top: -2px;
+        }
+        .navbar-editorial .navbar-tagline {
+          color: rgba(23,33,28,0.58);
+          letter-spacing: 0;
         }
         .navbar-center {
           display: flex;
@@ -155,6 +179,9 @@ export function Navbar() {
           border-radius: 2px;
           transition: all 0.2s;
         }
+        .navbar-editorial .hamburger span {
+          background: rgba(23,33,28,0.82);
+        }
         .mobile-menu {
           display: none;
           background: #162436;
@@ -162,6 +189,25 @@ export function Navbar() {
           padding: 1rem 1.5rem 1.5rem;
           gap: 0.75rem;
           flex-direction: column;
+        }
+        .navbar-editorial .mobile-menu {
+          background: #f6f0e6;
+          border-top: 1px solid rgba(23,33,28,0.12);
+        }
+        .navbar-editorial .desktop-auth .btn-secondary {
+          color: #17211c;
+          border-color: rgba(23,33,28,0.32);
+        }
+        .navbar-editorial .desktop-auth .btn-secondary:hover {
+          background: rgba(23,33,28,0.06);
+        }
+        .navbar-editorial .desktop-auth .btn-primary {
+          background: #17211c;
+          color: #fffaf1;
+          box-shadow: 0 10px 22px rgba(23,33,28,0.16);
+        }
+        .navbar-editorial .desktop-auth .btn-primary:hover {
+          background: #8f2638;
         }
         @media (max-width: 768px) {
           .navbar-center { display: none; }
@@ -181,7 +227,7 @@ export function Navbar() {
         </Link>
 
         <div className="navbar-center">
-          <LanguageToggle variant="navbar" />
+          <LanguageToggle variant={variant === 'editorial' ? 'page' : 'navbar'} />
         </div>
 
         <div className="navbar-right desktop-auth">
