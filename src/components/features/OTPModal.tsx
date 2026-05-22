@@ -11,20 +11,23 @@ interface OTPModalProps {
   onSuccess?: () => void;
   redirectTo?: string;
   contextMessage?: string;
+  role?: 'citizen' | 'advocate';
 }
 
 type Step = 'email' | 'otp';
 
-export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTPModalProps) {
+export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage, role = 'citizen' }: OTPModalProps) {
   const { t } = useLanguage();
   const { login } = useAuth();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>('email');
+  const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -50,23 +53,46 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
   async function handleRequestOtp(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setInfoMessage('');
     if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       setError(t('auth.error.email'));
       return;
     }
     setLoading(true);
-    const res = await apiClient('/auth/request-otp', {
+
+    // 1. Try to register with specified role
+    const registerRes = await apiClient('/auth/register', {
       method: 'POST',
-      body: { email },
+      body: { email, role },
       skipAuth: true,
     });
-    setLoading(false);
-    if (res.success) {
+
+    if (registerRes.success) {
+      setLoading(false);
+      setAuthMode('signup');
       setStep('otp');
       startCountdown();
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } else if (registerRes.statusCode === 409) {
+      // 2. Fallback to login
+      const loginRes = await apiClient('/auth/login', {
+        method: 'POST',
+        body: { email },
+        skipAuth: true,
+      });
+      setLoading(false);
+      if (loginRes.success) {
+        setAuthMode('login');
+        setInfoMessage('Welcome back! Enter the code sent to your email to log in.');
+        setStep('otp');
+        startCountdown();
+        setTimeout(() => otpRefs.current[0]?.focus(), 100);
+      } else {
+        setError(loginRes.error ?? t('shared.error'));
+      }
     } else {
-      setError(res.error ?? t('shared.error'));
+      setLoading(false);
+      setError(registerRes.error ?? t('shared.error'));
     }
   }
 
@@ -133,14 +159,27 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
   async function handleResend() {
     if (resendCountdown > 0) return;
     setError('');
+    setInfoMessage('');
     setLoading(true);
-    const res = await apiClient('/auth/request-otp', {
-      method: 'POST', body: { email }, skipAuth: true,
-    });
+
+    let res;
+    if (authMode === 'signup') {
+      res = await apiClient('/auth/register', {
+        method: 'POST', body: { email, role }, skipAuth: true,
+      });
+    } else {
+      res = await apiClient('/auth/login', {
+        method: 'POST', body: { email }, skipAuth: true,
+      });
+    }
+
     setLoading(false);
     if (res.success) {
       setOtp(['', '', '', '', '', '']);
       startCountdown();
+      if (authMode === 'login') {
+        setInfoMessage('OTP resent successfully!');
+      }
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } else {
       setError(res.error ?? t('shared.error'));
@@ -242,6 +281,15 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
           color: #DC2626;
           margin-bottom: 1rem;
         }
+        .otp-info {
+          background: rgba(16,185,129,0.08);
+          border: 1px solid rgba(16,185,129,0.2);
+          border-radius: 0.625rem;
+          padding: 0.75rem 1rem;
+          font-size: 0.875rem;
+          color: #059669;
+          margin-bottom: 1rem;
+        }
         .otp-inputs {
           display: flex;
           gap: 0.5rem;
@@ -318,7 +366,8 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage }: OTP
             {contextMessage && (
               <div className="otp-context">{contextMessage}</div>
             )}
-            {error && <div className="otp-error">{error}</div>}
+             {error && <div className="otp-error">{error}</div>}
+             {infoMessage && <div className="otp-info">{infoMessage}</div>}
 
             {step === 'email' ? (
               <form onSubmit={handleRequestOtp}>

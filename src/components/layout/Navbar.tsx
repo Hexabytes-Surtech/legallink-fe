@@ -12,7 +12,7 @@ interface NavbarProps {
 
 export function Navbar({ variant = 'dark' }: NavbarProps) {
   const { user, isAuthenticated, logout } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -244,9 +244,26 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
               {dropdownOpen && (
                 <div className="user-dropdown">
                   <div className="user-dropdown-email">{user?.email}</div>
-                  <Link href="/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
-                    {t('nav.myMatters')}
-                  </Link>
+                  {user?.role === 'advocate' ? (
+                    <>
+                      <Link href="/advocate/dashboard" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? 'Advocate Dashboard' : 'অ্যাডভোকেট ড্যাশবোর্ড'}
+                      </Link>
+                      <Link href="/advocate/onboarding" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? 'Onboarding Wizard' : 'অনবোর্ডিং উইজার্ড'}
+                      </Link>
+                      <Link href="/advocate/profile" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? 'Professional Profile' : 'পেশাগত প্রোফাইল'}
+                      </Link>
+                      <Link href="/advocate/documents" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? 'Verification Documents' : 'যাচাইকরণ নথিপত্র'}
+                      </Link>
+                    </>
+                  ) : (
+                    <Link href="/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                      {t('nav.myMatters')}
+                    </Link>
+                  )}
                   <button
                     className="user-dropdown-item"
                     style={{ color: '#EF4444' }}
@@ -259,6 +276,9 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
             </div>
           ) : (
             <>
+              <Link href="/auth/advocate-signup" className="btn btn-ghost btn-sm" style={{ color: '#C9A84C', fontWeight: 600, textDecoration: 'none', marginRight: '0.5rem' }}>
+                {language === 'en' ? 'Become an Advocate' : 'অ্যাডভোকেট হিসেবে যোগ দিন'}
+              </Link>
               <Link href="/auth/signup" className="btn btn-secondary btn-sm">
                 {t('nav.signin')}
               </Link>
@@ -284,15 +304,35 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
         <LanguageToggle variant="mobile" />
         {isAuthenticated ? (
           <>
-            <Link href="/matters" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
-              {t('nav.myMatters')}
-            </Link>
+            {user?.role === 'advocate' ? (
+              <>
+                <Link href="/advocate/dashboard" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
+                  {language === 'en' ? 'Advocate Dashboard' : 'অ্যাডভোকেট ড্যাশবোর্ড'}
+                </Link>
+                <Link href="/advocate/onboarding" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
+                  {language === 'en' ? 'Onboarding Wizard' : 'অনবোর্ডিং উইজার্ড'}
+                </Link>
+                <Link href="/advocate/profile" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
+                  {language === 'en' ? 'Professional Profile' : 'পেশাগত প্রোফাইল'}
+                </Link>
+                <Link href="/advocate/documents" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
+                  {language === 'en' ? 'Verification Documents' : 'যাচাইকরণ নথিপত্র'}
+                </Link>
+              </>
+            ) : (
+              <Link href="/matters" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
+                {t('nav.myMatters')}
+              </Link>
+            )}
             <button className="btn btn-ghost" onClick={() => { logout(); setMenuOpen(false); }}>
               {t('nav.signout')}
             </button>
           </>
         ) : (
           <>
+            <Link href="/auth/advocate-signup" className="btn btn-secondary" onClick={() => setMenuOpen(false)} style={{ borderColor: '#C9A84C', color: '#C9A84C' }}>
+              {language === 'en' ? 'Become an Advocate' : 'অ্যাডভোকেট হিসেবে যোগ দিন'}
+            </Link>
             <Link href="/auth/signup" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
               {t('nav.signin')}
             </Link>

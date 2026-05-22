@@ -3,11 +3,20 @@ export const ROUTES = {
   AUTH: {
     SIGNUP: '/auth/signup',
     LOGIN: '/auth/login',
+    ADVOCATE_SIGNUP: '/auth/advocate-signup',
   },
   APP: {
     INTAKE: '/intake',
     MATTERS: '/matters',
     MATTER_DETAIL: (id: string) => `/matter/${id}`,
     CHAT: (consultationId: string) => `/chat/${consultationId}`,
+  },
+  ADVOCATE: {
+    DASHBOARD: '/advocate/dashboard',
+    ONBOARDING: '/advocate/onboarding',
+    CONSULTATIONS: '/advocate/consultations',
+    CONSULTATION_DETAIL: (id: string) => `/advocate/consultations/${id}`,
+    PROFILE: '/advocate/profile',
+    DOCUMENTS: '/advocate/documents',
   },
 } as const;

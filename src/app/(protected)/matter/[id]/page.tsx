@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,6 @@ export default function MatterPage() {
   const { id } = useParams<{ id: string }>();
   const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
 
   const [matter, setMatter] = useState<Matter | null>(null);
   const [advocates, setAdvocates] = useState<Advocate[]>([]);
@@ -62,16 +61,7 @@ export default function MatterPage() {
     fetchMatter();
   }, [id, t]);
 
-  const handleRequestConsultation = useCallback((advocate: Advocate) => {
-    setSelectedAdvocate(advocate);
-    if (!isAuthenticated) {
-      setShowOTP(true);
-    } else {
-      submitConsultation(advocate.id);
-    }
-  }, [isAuthenticated]);
-
-  async function submitConsultation(advocateId: string) {
+  const submitConsultation = useCallback(async (advocateId: string) => {
     if (USE_MOCK) {
       await mockDelay(500);
       setConsultationStatus({
@@ -91,7 +81,17 @@ export default function MatterPage() {
     if (res.success && res.data) {
       setConsultationStatus(res.data);
     }
-  }
+  }, [id]);
+
+  const handleRequestConsultation = useCallback((advocate: Advocate) => {
+    setSelectedAdvocate(advocate);
+    const advocateId = advocate.id || advocate.advocate_id;
+    if (!isAuthenticated) {
+      setShowOTP(true);
+    } else if (advocateId) {
+      submitConsultation(advocateId);
+    }
+  }, [isAuthenticated, submitConsultation]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -155,7 +155,10 @@ export default function MatterPage() {
         <OTPModal
           onClose={() => setShowOTP(false)}
           contextMessage={selectedAdvocate ? `To request a consultation with ${selectedAdvocate.name}, please sign in or create a free account.` : undefined}
-          onSuccess={() => { if (selectedAdvocate) submitConsultation(selectedAdvocate.id); }}
+          onSuccess={() => {
+            const advocateId = selectedAdvocate?.id || selectedAdvocate?.advocate_id;
+            if (advocateId) submitConsultation(advocateId);
+          }}
           redirectTo={`/matter/${id}`}
         />
       )}
@@ -298,7 +301,7 @@ export default function MatterPage() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
               {advocates.map(advocate => (
-                <AdvocateCard key={advocate.id} advocate={advocate} onRequestConsultation={handleRequestConsultation} />
+                <AdvocateCard key={advocate.id || advocate.advocate_id} advocate={advocate} onRequestConsultation={handleRequestConsultation} />
               ))}
             </div>
           )}

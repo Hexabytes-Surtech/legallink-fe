@@ -36,19 +36,30 @@ export interface Matter {
 }
 
 export interface Advocate {
-  id: string;
-  userId: string;
+  id?: string;
+  advocate_id?: string;
+  userId?: string;
+  user_id?: string;
   name: string;
-  barEnrolmentNumber: string;
-  stateBar: string;
   address: string;
   phone: string;
   email?: string;
-  practiceAreas: string[];
+  advocate_email?: string;
+  barEnrolmentNumber?: string;
+  bar_enrolment_number?: string;
+  stateBar?: string;
+  state_bar?: string;
+  practiceAreas?: string[];
+  practice_areas?: string[];
   courts: string[];
   languages: string[];
   districts: string[];
-  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verificationStatus?: 'pending' | 'verified' | 'rejected';
+  verification_status?: 'pending' | 'verified' | 'rejected';
+  user_email?: string;
+  auth_email?: string;
+  preferred_language?: string;
+  avatar_url?: string;
 }
 
 export interface Consultation {
@@ -59,6 +70,20 @@ export interface Consultation {
   status: 'requested' | 'accepted' | 'declined' | 'closed';
   requestedAt: string;
   acceptedAt?: string;
+}
+
+export interface AdvocateConsultation {
+  id: string;
+  status: 'requested' | 'accepted' | 'declined' | 'closed';
+  requested_at: string;
+  accepted_at?: string;
+  query_text: string;
+  query_language: 'en' | 'bn';
+  classification: Classification;
+  citations?: Citation[];
+  ai_response_english?: string;
+  ai_response_bengali?: string;
+  citizen_user_id: string;
 }
 
 export interface Message {

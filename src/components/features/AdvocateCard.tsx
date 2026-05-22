@@ -25,7 +25,7 @@ const PRACTICE_LABELS: Record<string, string> = {
 };
 
 export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { isAuthenticated } = useAuth();
 
   const initials = advocate.name
@@ -166,7 +166,7 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.practiceAreas')}</div>
             <div className="advocate-tags">
-              {advocate.practiceAreas.map(area => (
+              {(advocate.practiceAreas || advocate.practice_areas || []).map(area => (
                 <span key={area} className="advocate-tag">
                   {PRACTICE_LABELS[area] ?? area}
                 </span>
@@ -177,7 +177,7 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.languages')}</div>
             <div className="advocate-tags">
-              {advocate.languages.map(lang => (
+              {(advocate.languages || []).map(lang => (
                 <span key={lang} className="advocate-tag" style={{ background: 'rgba(201,168,76,0.1)', color: '#A0803A' }}>
                   {LANGUAGE_NAMES[lang] ?? lang}
                 </span>
@@ -188,7 +188,7 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.districts')}</div>
             <div className="advocate-courts">
-              {advocate.courts.join(' · ')}
+              {(advocate.courts || []).join(' · ')}
             </div>
           </div>
         </div>

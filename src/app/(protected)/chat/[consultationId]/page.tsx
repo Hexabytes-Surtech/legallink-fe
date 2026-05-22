@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api/client';
 import { USE_MOCK, mockDelay, MOCK_MESSAGES } from '@/data/mock';
 import type { Message } from '@/types';
+import type { TranslationKey } from '@/i18n/config';
 
 export default function ChatPage() {
   const { consultationId } = useParams<{ consultationId: string }>();
@@ -20,6 +21,7 @@ export default function ChatPage() {
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'pending'>('pending');
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,7 +37,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
     async function loadMessages() {
@@ -53,7 +54,7 @@ export default function ChatPage() {
           }
           connectWebSocket();
         }
-      } catch (err) {
+      } catch {
         setError(t('chat.load.error'));
       }
     }
@@ -62,9 +63,9 @@ export default function ChatPage() {
       setWsStatus('connecting');
       const wsUrl = `ws://localhost:3000/ws/consultation/${consultationId}?token=${accessToken}`;
       try {
-        ws = new WebSocket(wsUrl);
-        ws.onopen = () => { setWsStatus('connected'); };
-        ws.onmessage = (event) => {
+        wsRef.current = new WebSocket(wsUrl);
+        wsRef.current.onopen = () => { setWsStatus('connected'); };
+        wsRef.current.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
             if (data.type === 'message' && data.payload) {
@@ -74,18 +75,18 @@ export default function ChatPage() {
             console.error('Failed to parse WS message:', e);
           }
         };
-        ws.onclose = () => {
+        wsRef.current.onclose = () => {
           setWsStatus('disconnected');
           reconnectTimer = setTimeout(connectWebSocket, 5000);
         };
-        ws.onerror = () => { setWsStatus('pending'); };
+        wsRef.current.onerror = () => { setWsStatus('pending'); };
       } catch { setWsStatus('pending'); }
     }
 
     loadMessages();
 
     return () => {
-      if (ws) ws.close();
+      if (wsRef.current) wsRef.current.close();
       clearTimeout(reconnectTimer);
     };
   }, [isAuthenticated, consultationId, accessToken, t]);
@@ -94,17 +95,39 @@ export default function ChatPage() {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const mockMsg: Message = {
-      id: `mock-new-${Date.now()}`,
+    const senderType: 'citizen' | 'advocate' = user?.role === 'advocate' ? 'advocate' : 'citizen';
+    const messagePayload = {
+      id: `msg-new-${Date.now()}`,
       consultationId,
-      senderType: 'citizen',
-      senderId: user?.userId || 'citizen-mock',
+      senderType,
+      senderId: user?.userId || 'mock-id',
       content: inputText.trim(),
-      moderationStatus: 'approved',
       createdAt: new Date().toISOString(),
     };
 
-    setMessages(prev => [...prev, mockMsg]);
+    if (USE_MOCK) {
+      const mockMsg: Message = {
+        ...messagePayload,
+        moderationStatus: 'approved',
+      };
+      setMessages(prev => [...prev, mockMsg]);
+    } else if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'message',
+        payload: {
+          content: inputText.trim(),
+          senderType,
+        }
+      }));
+    } else {
+      console.warn('WebSocket not connected. Message not sent to server.');
+      // Add local message representation anyway for testing UI resilience
+      const fallbackMsg: Message = {
+        ...messagePayload,
+        moderationStatus: 'approved',
+      };
+      setMessages(prev => [...prev, fallbackMsg]);
+    }
     setInputText('');
   };
 
@@ -116,17 +139,19 @@ export default function ChatPage() {
     );
   }
 
+  const backLink = user?.role === 'advocate' ? '/advocate/dashboard' : '/matters';
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--color-cream)' }}>
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '800px', margin: '0 auto', width: '100%', padding: '1rem' }}>
         <div style={{ background: 'white', padding: '1rem 1.5rem', borderRadius: '1rem 1rem 0 0', borderBottom: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: 'var(--shadow-sm)', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Link href="/matters" style={{ textDecoration: 'none', color: 'var(--color-gray-500)' }}>←</Link>
+            <Link href={backLink} style={{ textDecoration: 'none', color: 'var(--color-gray-500)', fontSize: '1.25rem' }}>←</Link>
             <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--color-navy)', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>{t('chat.title')}</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--color-gray-500)' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: wsStatus === 'connected' ? '#10B981' : wsStatus === 'connecting' ? '#F59E0B' : '#9CA3AF' }} />
-            <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>{t(`chat.status.${wsStatus}` as any) || wsStatus}</span>
+            <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>{t(`chat.status.${wsStatus}` as TranslationKey) || wsStatus}</span>
           </div>
         </div>
 
@@ -136,13 +161,13 @@ export default function ChatPage() {
             <div style={{ textAlign: 'center', color: 'var(--color-gray-400)', margin: 'auto', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>{t('chat.empty')}</div>
           ) : (
             messages.map((msg) => {
-              const isCitizen = msg.senderType === 'citizen';
+              const isOwnMessage = msg.senderId === user?.userId || msg.senderType === user?.role;
               return (
-                <div key={msg.id} style={{ alignSelf: isCitizen ? 'flex-end' : 'flex-start', maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: isCitizen ? 'flex-end' : 'flex-start' }}>
-                  <div className={isCitizen ? 'message-citizen' : 'message-advocate'} style={{ padding: '0.75rem 1rem', fontSize: '0.9375rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'var(--font-sans)', lineHeight: 1.5 }}>{msg.content}</div>
+                <div key={msg.id} style={{ alignSelf: isOwnMessage ? 'flex-end' : 'flex-start', maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: isOwnMessage ? 'flex-end' : 'flex-start' }}>
+                  <div className={isOwnMessage ? 'message-citizen' : 'message-advocate'} style={{ padding: '0.75rem 1rem', fontSize: '0.9375rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'var(--font-sans)', lineHeight: 1.5 }}>{msg.content}</div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--color-gray-400)', marginTop: '4px', display: 'flex', gap: '8px' }}>
                     <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    {msg.moderationStatus === 'pending' && !isCitizen && <span style={{ color: '#F59E0B' }}>• {t('chat.moderation')}</span>}
+                    {msg.moderationStatus === 'pending' && isOwnMessage && <span style={{ color: '#F59E0B' }}>• {t('chat.moderation')}</span>}
                   </div>
                 </div>
               );
