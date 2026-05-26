@@ -104,7 +104,7 @@ export default function MatterPage() {
             queryText: MOCK_MATTER.queryText,
             queryLanguage: MOCK_MATTER.queryLanguage,
             matterType: MOCK_MATTER.classification.matterType,
-            statute: MOCK_MATTER.classification.statute,
+            statute: MOCK_MATTER.classification.statute ?? null,
             location: normalizeLocation(MOCK_MATTER.classification.location),
             citations: MOCK_MATTER.citations,
             aiResponseEnglish: MOCK_MATTER.aiResponseEnglish,

@@ -553,7 +553,7 @@ export default function AdvocateConsultationDetailPage() {
           {consultation.classification.location && (
             <div>
               <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', color: '#9CA3AF', marginBottom: '4px' }}>Location</div>
-              <span className="badge badge-gray" style={{ fontSize: '0.85rem' }}>📍 {consultation.classification.location}</span>
+              <span className="badge badge-gray" style={{ fontSize: '0.85rem' }}>📍 {typeof consultation.classification.location === 'string' ? consultation.classification.location : `${consultation.classification.location?.state ?? ''}${consultation.classification.location?.district ? `, ${consultation.classification.location.district}` : ''}`}</span>
             </div>
           )}
         </div>
