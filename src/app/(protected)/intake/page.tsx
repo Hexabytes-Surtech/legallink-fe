@@ -48,7 +48,7 @@ export default function IntakePage() {
       }
 
       setAnalysisStep(1);
-      const res = await apiClient<{ id: string }>('/matter', {
+      const res = await apiClient<{ matterId?: string; id?: string }>('/matter', {
         method: 'POST',
         body: { query: trimmed, language },
       });
@@ -57,7 +57,16 @@ export default function IntakePage() {
         throw new Error(res.error ?? t('intake.error.generic'));
       }
 
-      router.push(`/matter/${res.data.id}`);
+      const matterId = res.data.matterId ?? res.data.id;
+      if (!matterId) throw new Error(t('intake.error.generic'));
+
+      try {
+        const stubs = JSON.parse(localStorage.getItem('ll_matter_stubs') ?? '[]');
+        stubs.unshift({ id: matterId, queryText: trimmed, status: 'user-owned', createdAt: new Date().toISOString() });
+        localStorage.setItem('ll_matter_stubs', JSON.stringify(stubs.slice(0, 50)));
+      } catch { /* ignore */ }
+
+      router.push(`/matter/${matterId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('intake.error.generic'));
       setLoading(false);
@@ -65,34 +74,34 @@ export default function IntakePage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--color-cream)' }}>
-      <main style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '3rem 1rem' }}>
-        <div style={{ width: '100%', maxWidth: '700px', margin: '0 auto' }}>
-          <div style={{ marginBottom: '2.5rem', animation: 'fadeIn 0.5s ease' }}>
-            <div className="badge badge-navy" style={{ marginBottom: '1rem' }}>
-              Anonymous · Free · Secure
-            </div>
-            <h1 className="text-headline" style={{ color: 'var(--color-navy)', marginBottom: '0.75rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-              {t('intake.title')}
-            </h1>
-            <p style={{ color: 'var(--color-gray-500)', fontSize: '1.0625rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-              {t('intake.subtitle')}
-            </p>
+    <div className="intake-shell">
+      <div className="intake-wrap">
+        <div style={{ textAlign: 'center', marginBottom: '2.5rem', animation: 'fadeIn 0.5s ease' }}>
+          <div className="intake-eyebrow">
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#C9A84C', boxShadow: '0 0 8px #C9A84C' }} />
+            {language === 'en' ? 'Anonymous · Free · Secure' : 'বেনামী · বিনামূল্যে · নিরাপদ'}
+          </div>
+          <h1 className="intake-title" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+            {t('intake.title')}
+          </h1>
+          <p className="intake-subtitle" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+            {t('intake.subtitle')}
+          </p>
+        </div>
+
+        <div className="intake-card" style={{ animation: 'cardIn 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('intake.language.label')}</span>
+            <LanguageToggle variant="page" />
           </div>
 
-          <div className="card" style={{ padding: '2.5rem', animation: 'slideInUp 0.5s ease 0.1s both' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-gray-500)' }}>{t('intake.language.label')}</span>
-              <LanguageToggle variant="page" />
+          {error && (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.875rem', padding: '0.875rem 1rem', color: '#DC2626', fontSize: '0.9rem', marginBottom: '1.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              ⚠️ {error}
             </div>
+          )}
 
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '0.625rem', padding: '0.875rem 1rem', color: '#DC2626', fontSize: '0.9rem', marginBottom: '1.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-                {error}
-              </div>
-            )}
-
-            {loading ? (
+          {loading ? (
               <div style={{ textAlign: 'center', padding: '3rem 0' }}>
                 <div style={{ marginBottom: '2rem' }}>
                   {steps.map((step, i) => (
@@ -121,31 +130,49 @@ export default function IntakePage() {
                 <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
                   <textarea
                     id="legal-query"
-                    className="input textarea"
-                    style={{ minHeight: '220px', fontSize: '1.0625rem', lineHeight: '1.65', padding: '1.125rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'var(--font-sans)', resize: 'vertical' }}
+                    className="intake-textarea"
+                    style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'var(--font-sans)' }}
                     placeholder={t('intake.placeholder')}
                     value={query}
                     onChange={e => { if (e.target.value.length <= MAX_CHARS) setQuery(e.target.value); if (error) setError(''); }}
                     maxLength={MAX_CHARS}
                   />
-                  <div style={{ position: 'absolute', bottom: '0.75rem', right: '0.875rem', fontSize: '0.75rem', color: query.length > MAX_CHARS * 0.9 ? '#F59E0B' : 'var(--color-gray-300)', background: 'white', padding: '0 4px' }}>
+                  <div style={{ position: 'absolute', bottom: '0.75rem', right: '1rem', fontSize: '0.75rem', fontWeight: 600, color: query.length > MAX_CHARS * 0.9 ? '#F59E0B' : '#9CA3AF', background: 'rgba(255,255,255,0.92)', padding: '2px 8px', borderRadius: '9999px' }}>
                     {query.length} / {MAX_CHARS}
                   </div>
                 </div>
 
-                <button type="submit" id="intake-submit" className="btn btn-primary" style={{ width: '100%', padding: '0.9375rem', fontSize: '1.0625rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }} disabled={!query.trim()}>
+                <button type="submit" id="intake-submit" className="intake-submit" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }} disabled={!query.trim()}>
                   {t('intake.submit')}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: '4px' }}><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
                 </button>
               </form>
             )}
           </div>
 
-          <p style={{ textAlign: 'center', fontSize: '0.8125rem', color: 'var(--color-gray-400)', marginTop: '1.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-            {language === 'en' ? '🔒 Anonymous by default. No sign-up required. Your data expires in 24 hours.' : '🔒 ডিফল্টভাবে বেনামে। কোনো সাইন আপ দরকার নেই। আপনার ডেটা ২৪ ঘণ্টায় মুছে যায়।'}
-          </p>
+          <div className="intake-trust-row">
+            <span className="intake-trust-item">
+              <span className="intake-trust-icon">🔒</span>
+              <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+                {language === 'en' ? 'End-to-end private' : 'সম্পূর্ণ ব্যক্তিগত'}
+              </span>
+            </span>
+            <span className="intake-trust-item">
+              <span className="intake-trust-icon">⏱</span>
+              <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+                {language === 'en' ? '24h auto-delete' : '২৪ ঘণ্টা পরে মুছে যায়'}
+              </span>
+            </span>
+            <span className="intake-trust-item">
+              <span className="intake-trust-icon">✓</span>
+              <span style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+                {language === 'en' ? 'No sign-up required' : 'সাইন আপ প্রয়োজন নেই'}
+              </span>
+            </span>
+          </div>
         </div>
-      </main>
     </div>
   );
 }

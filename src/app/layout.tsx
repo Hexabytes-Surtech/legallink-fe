@@ -2,14 +2,40 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.in';
+
 export const metadata: Metadata = {
-  title: 'LegalLink — Free Legal Aid for West Bengal',
-  description: 'Describe your legal problem anonymously. Our AI analyses it, retrieves relevant statutes and judgments, and connects you with verified advocates — completely free.',
-  keywords: 'legal aid, free legal advice, West Bengal, Bengali, advocate, legal help, citizen rights',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'LegalLink — Free Legal Aid for West Bengal',
+    template: '%s | LegalLink',
+  },
+  description:
+    'Describe your legal problem anonymously in English or Bengali. LegalLink AI analyses it, retrieves real Indian statute citations, and connects you with verified Bar Council advocates — completely free.',
+  keywords: [
+    'legal aid', 'free legal advice', 'West Bengal', 'Bengali legal help',
+    'advocate Kolkata', 'citizen rights India', 'BCI advocate', 'law help WB',
+    'আইনি সহায়তা', 'বাংলাদেশ আইন', 'পশ্চিমবঙ্গ আইনজীবী',
+  ],
+  authors: [{ name: 'LegalLink' }],
+  creator: 'LegalLink',
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true } },
   openGraph: {
-    title: 'LegalLink — Free Legal Aid',
-    description: 'Anonymous AI-powered legal guidance for citizens of West Bengal.',
+    title: 'LegalLink — Free AI-Powered Legal Aid',
+    description: 'Anonymous AI legal guidance for citizens of West Bengal. Bilingual (English & Bengali), real statute citations, verified advocates.',
+    url: SITE_URL,
+    siteName: 'LegalLink',
+    locale: 'en_IN',
     type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LegalLink — Free Legal Aid for West Bengal',
+    description: 'AI-powered, anonymous, bilingual legal guidance. Connect with verified advocates.',
+  },
+  alternates: {
+    canonical: SITE_URL,
+    languages: { 'en-IN': `${SITE_URL}`, 'bn-IN': `${SITE_URL}?lang=bn` },
   },
 };
 
@@ -23,6 +49,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Tiro+Bangla+Sangam&display=swap"
           rel="stylesheet"
         />
+        <meta name="theme-color" content="#0D1B2A" />
+        <meta name="format-detection" content="telephone=no" />
       </head>
       <body style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
         <Providers>

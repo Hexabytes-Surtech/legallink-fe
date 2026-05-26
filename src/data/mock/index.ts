@@ -123,12 +123,11 @@ export const MOCK_ADVOCATES: Advocate[] = [
 ];
 
 export const MOCK_CONSULTATION: Consultation = {
-  id: 'cons-001',
+  consultationId: 'cons-001',
   matterId: 'mock-matter-001',
-  citizenId: 'citizen-001',
   advocateId: 'adv-001',
-  status: 'requested',
-  requestedAt: new Date().toISOString(),
+  status: 'pending',
+  createdAt: new Date().toISOString(),
 };
 
 export const MOCK_MESSAGES: Message[] = [

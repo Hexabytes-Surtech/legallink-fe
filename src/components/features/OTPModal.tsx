@@ -127,7 +127,6 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage, role 
     setLoading(true);
     const res = await apiClient<{
       accessToken: string;
-      refreshToken: string;
       user: { userId: string; email: string; role: 'citizen' | 'advocate' | 'admin' };
     }>('/auth/verify-otp', {
       method: 'POST',

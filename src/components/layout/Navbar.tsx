@@ -5,17 +5,21 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from '@/components/features/LanguageToggle';
+import { apiClient } from '@/lib/api/client';
 
 interface NavbarProps {
   variant?: 'dark' | 'editorial';
 }
 
 export function Navbar({ variant = 'dark' }: NavbarProps) {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, updateUser } = useAuth();
   const { t, language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -26,6 +30,31 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  async function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError(language === 'en' ? 'Image too large (max 5MB)' : 'ছবি খুব বড় (সর্বোচ্চ ৫MB)');
+      e.target.value = '';
+      return;
+    }
+    setAvatarError('');
+    setUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append('avatar', file);
+      const res = await apiClient<{ avatar_url: string }>('/user/avatar', { method: 'POST', formData: fd });
+      if (res.success && res.data?.avatar_url) {
+        updateUser({ avatar_url: res.data.avatar_url });
+      } else {
+        setAvatarError(res.error ?? 'Upload failed');
+      }
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
+    }
+  }
 
   return (
     <header className={`navbar navbar-${variant}`}>
@@ -233,17 +262,47 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
         <div className="navbar-right desktop-auth">
           {isAuthenticated ? (
             <div style={{ position: 'relative' }} ref={dropdownRef}>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleAvatarSelect}
+              />
               <div
                 className="user-avatar"
                 onClick={() => setDropdownOpen(p => !p)}
                 role="button"
                 aria-label="User menu"
+                style={{
+                  backgroundImage: user?.avatar_url ? `url(${user.avatar_url})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
               >
-                {user?.email?.[0]?.toUpperCase() ?? 'U'}
+                {!user?.avatar_url && (user?.email?.[0]?.toUpperCase() ?? 'U')}
               </div>
               {dropdownOpen && (
                 <div className="user-dropdown">
                   <div className="user-dropdown-email">{user?.email}</div>
+                  <button
+                    className="user-dropdown-item"
+                    onClick={() => { avatarInputRef.current?.click(); setDropdownOpen(false); }}
+                    disabled={uploadingAvatar}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  >
+                    <span aria-hidden>📷</span>
+                    {uploadingAvatar
+                      ? (language === 'en' ? 'Uploading…' : 'আপলোড হচ্ছে…')
+                      : user?.avatar_url
+                        ? (language === 'en' ? 'Change photo' : 'ছবি পরিবর্তন')
+                        : (language === 'en' ? 'Upload photo' : 'ছবি আপলোড')}
+                  </button>
+                  {avatarError && (
+                    <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', color: '#FCA5A5' }}>
+                      {avatarError}
+                    </div>
+                  )}
                   {user?.role === 'advocate' ? (
                     <>
                       <Link href="/advocate/dashboard" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
@@ -257,6 +316,15 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
                       </Link>
                       <Link href="/advocate/documents" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
                         {language === 'en' ? 'Verification Documents' : 'যাচাইকরণ নথিপত্র'}
+                      </Link>
+                    </>
+                  ) : user?.role === 'admin' ? (
+                    <>
+                      <Link href="/admin" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? 'Admin Dashboard' : 'অ্যাডমিন ড্যাশবোর্ড'}
+                      </Link>
+                      <Link href="/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {t('nav.myMatters')}
                       </Link>
                     </>
                   ) : (
@@ -317,6 +385,15 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
                 </Link>
                 <Link href="/advocate/documents" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
                   {language === 'en' ? 'Verification Documents' : 'যাচাইকরণ নথিপত্র'}
+                </Link>
+              </>
+            ) : user?.role === 'admin' ? (
+              <>
+                <Link href="/admin" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
+                  {language === 'en' ? 'Admin Dashboard' : 'অ্যাডমিন ড্যাশবোর্ড'}
+                </Link>
+                <Link href="/matters" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
+                  {t('nav.myMatters')}
                 </Link>
               </>
             ) : (

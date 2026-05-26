@@ -35,7 +35,7 @@ export default function ConsultationsListPage() {
             const defaultConsultations: AdvocateConsultation[] = [
               {
                 id: 'cons-mock-1',
-                status: 'requested',
+                status: 'pending',
                 requested_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
                 query_text: 'My landlord locked me out of my apartment and is withholding my security deposit. I need immediate advice.',
                 query_language: 'en',
@@ -185,9 +185,9 @@ export default function ConsultationsListPage() {
 
   // Filter based on selected tab
   const filteredConsultations = consultations.filter(c => {
-    if (activeTab === 'pending') return c.status === 'requested';
+    if (activeTab === 'pending') return c.status === 'pending';
     if (activeTab === 'active') return c.status === 'accepted';
-    return true; // 'all'
+    return true;
   });
 
   if (loading) {
@@ -294,7 +294,7 @@ export default function ConsultationsListPage() {
         <button className={`tab-btn ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
           {language === 'en' ? 'Pending Requests' : 'পেন্ডিং অনুরোধ'}
           <span style={{ fontSize: '0.8rem', background: 'rgba(13,27,42,0.08)', padding: '2px 8px', borderRadius: '9999px', marginLeft: '0.5rem' }}>
-            {consultations.filter(c => c.status === 'requested').length}
+            {consultations.filter(c => c.status === 'pending').length}
           </span>
         </button>
         <button className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`} onClick={() => setActiveTab('active')}>
@@ -321,13 +321,17 @@ export default function ConsultationsListPage() {
                       {cons.classification.matterType}
                     </span>
                   )}
-                  {cons.classification?.location && (
-                    <span className="badge badge-gray" style={{ fontSize: '0.7rem' }}>
-                      📍 {cons.classification.location}
-                    </span>
-                  )}
-                  <span className={`badge ${status === 'requested' ? 'badge-navy' : status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ textTransform: 'capitalize', fontSize: '0.7rem', fontWeight: 700 }}>
-                    {status === 'requested' ? 'pending approval' : status}
+                  {(() => {
+                    const loc = cons.classification?.location;
+                    const locStr = !loc ? null : typeof loc === 'string' ? loc : [(loc as { district?: string | null }).district, (loc as { state?: string | null }).state].filter(Boolean).join(', ') || null;
+                    return locStr ? (
+                      <span className="badge badge-gray" style={{ fontSize: '0.7rem' }}>
+                        📍 {locStr}
+                      </span>
+                    ) : null;
+                  })()}
+                  <span className={`badge ${status === 'pending' ? 'badge-navy' : status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ textTransform: 'capitalize', fontSize: '0.7rem', fontWeight: 700 }}>
+                    {status === 'pending' ? 'pending approval' : status}
                   </span>
                 </div>
                 <span style={{ fontSize: '0.8rem', color: '#9CA3AF' }}>
@@ -347,24 +351,25 @@ export default function ConsultationsListPage() {
               )}
 
               {/* Action Area */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap', borderTop: '1px solid #F3F4F6', paddingTop: '1.25rem' }}>
-                <Link href={`/advocate/consultations/${cons.id}`} className="btn btn-secondary btn-sm" style={{ fontWeight: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem', flexWrap: 'wrap', borderTop: '1px solid rgba(13,27,42,0.06)', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
+                <Link href={`/advocate/consultations/${cons.id}`} style={{ padding: '0.625rem 1.25rem', background: 'transparent', color: '#6B7280', border: '1.5px solid rgba(13,27,42,0.10)', borderRadius: '9999px', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none', transition: 'all 0.2s ease', display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
                   {language === 'en' ? 'View Details' : 'বিস্তারিত দেখুন'}
                 </Link>
 
-                {status === 'requested' && (
+                {status === 'pending' && (
                   <>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => openDeclineModal(cons.id)} disabled={submittingAction} style={{ borderColor: '#EF4444', color: '#EF4444' }}>
+                    <button type="button" className="btn-decline" onClick={() => openDeclineModal(cons.id)} disabled={submittingAction}>
                       {language === 'en' ? 'Decline' : 'প্রত্যাখ্যান করুন'}
                     </button>
-                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleAccept(cons.id)} disabled={submittingAction} style={{ background: 'linear-gradient(to right, #059669, #10B981)', borderColor: '#059669', color: 'white', fontWeight: 600 }}>
+                    <button type="button" className="btn-accept" onClick={() => handleAccept(cons.id)} disabled={submittingAction}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                       {language === 'en' ? 'Accept Request' : 'অনুরোধ গ্রহণ করুন'}
                     </button>
                   </>
                 )}
 
                 {status === 'accepted' && (
-                  <Link href={`/chat/${cons.id}`} className="btn btn-primary btn-sm" style={{ background: 'linear-gradient(to right, #C9A84C, #E2C475)', borderColor: '#C9A84C', color: '#0D1B2A', fontWeight: 700 }}>
+                  <Link href={`/chat/${cons.id}`} style={{ padding: '0.625rem 1.5rem', background: 'linear-gradient(135deg, #C9A84C, #E2C475)', color: '#0D1B2A', border: 'none', borderRadius: '9999px', fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none', boxShadow: '0 4px 12px -2px rgba(201,168,76,0.45)', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s ease' }}>
                     💬 {language === 'en' ? 'Enter Chat Room' : 'চ্যাট রুমে প্রবেশ করুন'}
                   </Link>
                 )}

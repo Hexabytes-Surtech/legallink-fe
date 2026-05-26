@@ -50,7 +50,7 @@ export default function AdvocateConsultationDetailPage() {
             const defaults: Record<string, AdvocateConsultation> = {
               'cons-mock-1': {
                 id: 'cons-mock-1',
-                status: 'requested',
+                status: 'pending',
                 requested_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
                 query_text: 'My landlord locked me out of my apartment and is withholding my security deposit. I need immediate advice.',
                 query_language: 'en',
@@ -429,8 +429,8 @@ export default function AdvocateConsultationDetailPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <span className={`badge ${status === 'requested' ? 'badge-navy' : status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ textTransform: 'capitalize', fontSize: '0.75rem', fontWeight: 700 }}>
-                {status === 'requested' ? 'Pending Approval' : status}
+              <span className={`badge ${status === 'pending' ? 'badge-navy' : status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ textTransform: 'capitalize', fontSize: '0.75rem', fontWeight: 700 }}>
+                {status === 'pending' ? 'Pending Approval' : status}
               </span>
               <span style={{ color: '#9CA3AF', fontSize: '0.85rem' }}>
                 Ref: {consultation.id}
@@ -443,7 +443,7 @@ export default function AdvocateConsultationDetailPage() {
 
           {/* Action buttons based on status */}
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {status === 'requested' && (
+            {status === 'pending' && (
               <>
                 <button
                   type="button"

@@ -5,16 +5,15 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api/client';
 import { USE_MOCK, mockDelay, MOCK_MATTERS } from '@/data/mock';
-import type { Matter } from '@/types';
+import type { MatterStub } from '@/types';
 
 export default function MyMattersPage() {
   const { t, language } = useLanguage();
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
-  const [matters, setMatters] = useState<Matter[]>([]);
+  const [stubs, setStubs] = useState<MatterStub[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -27,19 +26,23 @@ export default function MyMattersPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    async function fetchMatters() {
+    async function loadMatters() {
       setLoading(true);
       try {
         if (USE_MOCK) {
-          await mockDelay(600);
-          setMatters(MOCK_MATTERS);
+          await mockDelay(400);
+          const mock: MatterStub[] = MOCK_MATTERS.map(m => ({
+            id: m.id,
+            queryText: m.queryText,
+            matterType: m.classification?.matterType,
+            status: m.status,
+            createdAt: m.createdAt,
+          }));
+          setStubs(mock);
         } else {
-          const res = await apiClient<Matter[]>('/matter');
-          if (res.success && res.data) {
-            setMatters(res.data);
-          } else {
-            throw new Error(res.error || t('shared.error'));
-          }
+          // No list endpoint in Phase 1 — read from localStorage cache
+          const cached = localStorage.getItem('ll_matter_stubs');
+          setStubs(cached ? JSON.parse(cached) : []);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : t('shared.error'));
@@ -47,7 +50,7 @@ export default function MyMattersPage() {
         setLoading(false);
       }
     }
-    fetchMatters();
+    loadMatters();
   }, [isAuthenticated, t]);
 
   if (isLoading || (loading && isAuthenticated)) {
@@ -87,49 +90,48 @@ export default function MyMattersPage() {
           </div>
         )}
 
-        {matters.length === 0 && !error ? (
+        {stubs.length === 0 && !error ? (
           <div className="card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📂</div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.5rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
               {t('matters.empty')}
             </h3>
-            <Link href="/intake" className="btn btn-secondary" style={{ marginTop: '1rem' }}>
+            <p style={{ color: 'var(--color-gray-400)', fontSize: '0.9rem', marginBottom: '1rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
+              {language === 'en' ? 'Describe your legal problem to get started.' : 'শুরু করতে আপনার আইনি সমস্যা বর্ণনা করুন।'}
+            </p>
+            <Link href="/intake" className="btn btn-secondary" style={{ marginTop: '0.5rem' }}>
               {t('matters.empty.cta')}
             </Link>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '1.25rem' }}>
-            {matters.map(matter => {
-              const isExpired = matter.expiresAt && new Date(matter.expiresAt) < new Date();
-              return (
-                <div key={matter.id} className="card card-hover" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      {matter.classification?.matterType && (
-                        <span className="badge badge-navy">{matter.classification.matterType}</span>
-                      )}
-                      <span className={`badge ${matter.status === 'session-owned' ? 'badge-gray' : 'badge-green'}`}>
-                        {matter.status === 'session-owned' ? t('matters.status.session') : t('matters.status.owned')}
-                      </span>
-                      {isExpired && <span className="badge badge-red">{t('matter.expired')}</span>}
-                    </div>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-400)', whiteSpace: 'nowrap' }}>
-                      {new Date(matter.createdAt).toLocaleDateString(language === 'bn' ? 'bn-IN' : 'en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </div>
+            {stubs.map(stub => (
+              <div key={stub.id} className="card card-hover" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {stub.matterType && (
+                      <span className="badge badge-navy">{stub.matterType}</span>
+                    )}
+                    <span className="badge badge-green">
+                      {t('matters.status.owned')}
+                    </span>
                   </div>
-
-                  <h3 style={{ fontSize: '1.0625rem', fontWeight: 500, color: 'var(--color-navy)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {matter.queryText}
-                  </h3>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto' }}>
-                    <Link href={`/matter/${matter.id}`} className="btn btn-ghost btn-sm" style={{ fontWeight: 600, color: '#C9A84C' }}>
-                      {t('matters.view')} →
-                    </Link>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-400)', whiteSpace: 'nowrap' }}>
+                    {new Date(stub.createdAt).toLocaleDateString(language === 'bn' ? 'bn-IN' : 'en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
                   </div>
                 </div>
-              );
-            })}
+
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 500, color: 'var(--color-navy)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {stub.queryText}
+                </h3>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto' }}>
+                  <Link href={`/matter/${stub.id}`} className="btn btn-ghost btn-sm" style={{ fontWeight: 600, color: '#C9A84C' }}>
+                    {t('matters.view')} →
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </main>

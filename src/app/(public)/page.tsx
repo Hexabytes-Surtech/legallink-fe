@@ -37,12 +37,29 @@ const CASE_NOTES = [
   { value: '0', label: 'fees to begin' },
 ];
 
+const JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'LegalLink',
+  description: 'AI-powered legal aid platform for citizens of West Bengal. Free, anonymous, bilingual legal guidance with real statute citations and verified advocates.',
+  url: 'https://legallink.in',
+  applicationCategory: 'LegalService',
+  operatingSystem: 'Any',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
+  inLanguage: ['en', 'bn'],
+  areaServed: { '@type': 'AdministrativeArea', name: 'West Bengal, India' },
+};
+
 export default function LandingPage() {
   const { t, language } = useLanguage();
   const isBangla = language === 'bn';
 
   return (
     <div className="ll-landing">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       <style>{`
         .ll-landing {
           min-height: 100vh;

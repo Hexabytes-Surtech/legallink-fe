@@ -66,8 +66,8 @@ export default function AdvocateDashboardPage() {
             consultations = [
               {
                 id: 'cons-mock-1',
-                status: 'requested',
-                requested_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 mins ago
+                status: 'pending',
+                requested_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
                 query_text: 'My landlord locked me out of my apartment and is withholding my deposit.',
                 query_language: 'en',
                 classification: {
@@ -101,7 +101,7 @@ export default function AdvocateDashboardPage() {
 
           // Calculate counts
           const total = consultations.length;
-          const pending = consultations.filter(c => c.status === 'requested').length;
+          const pending = consultations.filter(c => c.status === 'pending').length;
           const accepted = consultations.filter(c => c.status === 'accepted').length;
           const declined = consultations.filter(c => c.status === 'declined').length;
           const closed = consultations.filter(c => c.status === 'closed').length;
@@ -400,7 +400,7 @@ export default function AdvocateDashboardPage() {
             <div key={cons.id} className="list-row">
               <div>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span className={`badge ${cons.status === 'requested' ? 'badge-navy' : cons.status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
+                  <span className={`badge ${cons.status === 'pending' ? 'badge-navy' : cons.status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
                     {cons.status}
                   </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-400)' }}>

@@ -7,6 +7,8 @@ interface User {
   userId: string;
   email: string;
   role: 'citizen' | 'advocate' | 'admin';
+  name?: string;
+  avatar_url?: string | null;
 }
 
 interface AuthContextValue {
@@ -15,8 +17,9 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   role: 'citizen' | 'advocate' | 'admin' | null;
-  login: (tokens: { accessToken: string; refreshToken: string; user: User }) => void;
+  login: (tokens: { accessToken: string; refreshToken?: string; user: User }) => void;
   logout: () => void;
+  updateUser: (patch: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -74,12 +77,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restoreSession();
   }, [clearSession]);
 
-  const login = useCallback((tokens: { accessToken: string; refreshToken: string; user: User }) => {
+  const login = useCallback((tokens: { accessToken: string; refreshToken?: string; user: User }) => {
     localStorage.setItem('ll_access_token', tokens.accessToken);
-    localStorage.setItem('ll_refresh_token', tokens.refreshToken);
+    if (tokens.refreshToken) localStorage.setItem('ll_refresh_token', tokens.refreshToken);
     localStorage.setItem('ll_user', JSON.stringify(tokens.user));
     setAccessToken(tokens.accessToken);
     setUser(tokens.user);
+  }, []);
+
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem('ll_user', JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const logout = useCallback(async () => {
@@ -107,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: user?.role || null,
         login,
         logout,
+        updateUser,
       }}
     >
       {children}

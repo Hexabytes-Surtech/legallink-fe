@@ -150,9 +150,9 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           <div className="advocate-avatar">{initials}</div>
           <div className="advocate-name-block">
             <div className="advocate-name">{advocate.name}</div>
-            <div className="advocate-enrolment">{advocate.barEnrolmentNumber}</div>
+            <div className="advocate-enrolment">{advocate.barEnrolmentNumber ?? advocate.bar_enrolment_number}</div>
           </div>
-          {advocate.verificationStatus === 'verified' && (
+          {(advocate.verificationStatus ?? advocate.verification_status) === 'verified' && (
             <div className="advocate-verified-badge">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
@@ -188,7 +188,7 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
           <div className="advocate-info-row">
             <div className="advocate-info-label">{t('matter.districts')}</div>
             <div className="advocate-courts">
-              {(advocate.courts || []).join(' · ')}
+              {(advocate.districts || []).join(' · ')}
             </div>
           </div>
         </div>
