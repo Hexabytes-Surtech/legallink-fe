@@ -94,8 +94,8 @@ function SignupContent() {
     });
     setLoading(false);
     if (res.success && res.data) {
-      login(res.data);
-      router.push(returnTo);
+      // returnTo from query string takes priority over role default
+      login(res.data, returnTo);
     } else {
       setError(res.error ?? t('auth.error.invalid'));
       setOtp('');

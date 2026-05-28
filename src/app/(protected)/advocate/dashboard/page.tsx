@@ -1,440 +1,655 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api/client';
-import { USE_MOCK, mockDelay } from '@/data/mock';
-import type { Advocate, AdvocateConsultation } from '@/types';
+import type {
+  Advocate,
+  AdvocateConsultation,
+  AdvocateDashboardStats,
+  ConsultationStatus,
+} from '@/types';
 
-interface DashboardData {
-  verificationStatus: 'pending' | 'verified' | 'rejected';
-  profileCompleteness: number;
-  consultationStats: {
-    pending_count: string | number;
-    accepted_count: string | number;
-    declined_count: string | number;
-    closed_count: string | number;
-    total_count: string | number;
-  };
+type TabKey = 'requests' | 'active' | 'closed';
+
+interface ActionState {
+  consultationId: string;
+  action: 'accept' | 'decline';
+}
+
+function relativeTime(iso: string, isBn: boolean): string {
+  const then = new Date(iso).getTime();
+  if (!then) return '';
+  const diff = Date.now() - then;
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return isBn ? 'এখনই' : 'just now';
+  if (min < 60) return isBn ? `${min} মিনিট আগে` : `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return isBn ? `${hr} ঘণ্টা আগে` : `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  if (d < 7) return isBn ? `${d} দিন আগে` : `${d}d ago`;
+  return new Date(iso).toLocaleDateString(isBn ? 'bn-IN' : 'en-IN', { dateStyle: 'medium' });
+}
+
+function urgency(text: string): { label: string; color: string } {
+  const lower = text.toLowerCase();
+  if (/urgent|immediate|emergency|arrest|today|tonight/.test(lower)) {
+    return { label: 'High', color: '#DC2626' };
+  }
+  if (/this week|soon|asap/.test(lower)) {
+    return { label: 'Medium', color: '#D97706' };
+  }
+  return { label: 'Normal', color: '#0D1B2A' };
 }
 
 export default function AdvocateDashboardPage() {
   const { language } = useLanguage();
   const { user } = useAuth();
+  const isBn = language === 'bn';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [advocate, setAdvocate] = useState<Advocate | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [recentConsultations, setRecentConsultations] = useState<AdvocateConsultation[]>([]);
+  const [stats, setStats] = useState<AdvocateDashboardStats | null>(null);
+  const [consultations, setConsultations] = useState<AdvocateConsultation[]>([]);
+  const [tab, setTab] = useState<TabKey>('requests');
+  const [pendingAction, setPendingAction] = useState<ActionState | null>(null);
+  const [actionNote, setActionNote] = useState('');
+  const [actionSaving, setActionSaving] = useState(false);
+
+  const refreshConsultations = useCallback(async () => {
+    const cons = await apiClient<AdvocateConsultation[] | { consultations: AdvocateConsultation[] }>(
+      '/advocate/consultations'
+    );
+    if (cons.success && cons.data) {
+      const list = Array.isArray(cons.data) ? cons.data : cons.data.consultations ?? [];
+      setConsultations(list);
+    }
+    const dash = await apiClient<AdvocateDashboardStats>('/advocate/dashboard');
+    if (dash.success && dash.data) setStats(dash.data);
+  }, []);
 
   useEffect(() => {
-    async function loadDashboard() {
-      setLoading(true);
-      setError('');
+    let cancelled = false;
+    async function load() {
       try {
-        if (USE_MOCK) {
-          await mockDelay(600);
-
-          // Get profile from localStorage
-          const localProfile = localStorage.getItem('mock_advocate_profile');
-          let profile: Advocate;
-          if (localProfile) {
-            profile = JSON.parse(localProfile);
-          } else {
-            profile = {
-              name: 'John Doe',
-              address: '',
-              phone: '',
-              verification_status: 'pending',
-              auth_email: user?.email,
-              courts: [],
-              languages: ['en'],
-              districts: [],
-            };
-          }
-          setAdvocate(profile);
-
-          // Get consultations
-          const cachedConsultations = localStorage.getItem('mock_advocate_consultations');
-          let consultations: AdvocateConsultation[] = [];
-          if (cachedConsultations) {
-            consultations = JSON.parse(cachedConsultations);
-          } else {
-            consultations = [
-              {
-                id: 'cons-mock-1',
-                status: 'pending',
-                requested_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-                query_text: 'My landlord locked me out of my apartment and is withholding my deposit.',
-                query_language: 'en',
-                classification: {
-                  matterType: 'Tenancy & Housing',
-                  statute: 'Premises Eviction Act',
-                  userQuestion: 'Can I sue my landlord?',
-                  involvesPolice: false,
-                  location: 'Kolkata, WB',
-                },
-                citizen_user_id: 'citizen-11',
-              },
-              {
-                id: 'cons-mock-2',
-                status: 'accepted',
-                requested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(), // 2 hours ago
-                accepted_at: new Date(Date.now() - 1.8 * 3600 * 1000).toISOString(),
-                query_text: 'Employment contract terminated without pay or notice period.',
-                query_language: 'en',
-                classification: {
-                  matterType: 'Labour & Employment',
-                  statute: 'Payment of Wages Act',
-                  userQuestion: 'How to recover unpaid salary?',
-                  involvesPolice: false,
-                  location: 'Howrah, WB',
-                },
-                citizen_user_id: 'citizen-12',
-              },
-            ];
-            localStorage.setItem('mock_advocate_consultations', JSON.stringify(consultations));
-          }
-
-          // Calculate counts
-          const total = consultations.length;
-          const pending = consultations.filter(c => c.status === 'pending').length;
-          const accepted = consultations.filter(c => c.status === 'accepted').length;
-          const declined = consultations.filter(c => c.status === 'declined').length;
-          const closed = consultations.filter(c => c.status === 'closed').length;
-
-          // Calculate completeness
-          const fields = [profile.name, profile.phone, profile.address, profile.bar_enrolment_number || profile.barEnrolmentNumber, profile.state_bar || profile.stateBar];
-          const completedFields = fields.filter(Boolean).length;
-          const completeness = Math.round((completedFields / fields.length) * 100);
-
-          setDashboardData({
-            verificationStatus: profile.verification_status || 'pending',
-            profileCompleteness: completeness,
-            consultationStats: {
-              pending_count: pending,
-              accepted_count: accepted,
-              declined_count: declined,
-              closed_count: closed,
-              total_count: total,
-            },
-          });
-
-          setRecentConsultations(consultations.slice(0, 5));
-        } else {
-          // Real Mode API Calls
-          const profileRes = await apiClient<Advocate>('/advocate/me');
-          if (profileRes.success && profileRes.data) {
-            setAdvocate(profileRes.data);
-          }
-
-          const dashRes = await apiClient<DashboardData>('/advocate/dashboard');
-          if (dashRes.success && dashRes.data) {
-            setDashboardData(dashRes.data);
-          }
-
-          const consultationsRes = await apiClient<AdvocateConsultation[]>('/advocate/consultations');
-          if (consultationsRes.success && consultationsRes.data) {
-            setRecentConsultations(consultationsRes.data.slice(0, 5));
-          }
+        const [profile, dash, cons] = await Promise.all([
+          apiClient<Advocate>('/advocate/me'),
+          apiClient<AdvocateDashboardStats>('/advocate/dashboard'),
+          apiClient<AdvocateConsultation[] | { consultations: AdvocateConsultation[] }>(
+            '/advocate/consultations'
+          ),
+        ]);
+        if (cancelled) return;
+        if (profile.success && profile.data) setAdvocate(profile.data);
+        if (dash.success && dash.data) setStats(dash.data);
+        if (cons.success && cons.data) {
+          const list = Array.isArray(cons.data) ? cons.data : cons.data.consultations ?? [];
+          setConsultations(list);
         }
       } catch {
-        setError(language === 'en' ? 'Could not load dashboard statistics.' : 'ড্যাশবোর্ড পরিসংখ্যান লোড করা যায়নি।');
+        if (!cancelled) setError(isBn ? 'ড্যাশবোর্ড লোড করা যায়নি।' : 'Could not load dashboard.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBn]);
 
-    loadDashboard();
-  }, [user, language]);
+  const buckets = useMemo(() => {
+    const requests: AdvocateConsultation[] = [];
+    const active: AdvocateConsultation[] = [];
+    const closed: AdvocateConsultation[] = [];
+    for (const c of consultations) {
+      if (c.status === 'pending') requests.push(c);
+      else if (c.status === 'accepted') active.push(c);
+      else closed.push(c); // declined / closed
+    }
+    const byRequestedAtDesc = (a: AdvocateConsultation, b: AdvocateConsultation) =>
+      new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime();
+    requests.sort(byRequestedAtDesc);
+    active.sort(byRequestedAtDesc);
+    closed.sort(byRequestedAtDesc);
+    return { requests, active, closed };
+  }, [consultations]);
+
+  async function performAction(consultationId: string, status: ConsultationStatus, note?: string) {
+    setActionSaving(true);
+    try {
+      const res = await apiClient<AdvocateConsultation>(
+        `/advocate/consultations/${consultationId}`,
+        { method: 'PUT', body: { status, note } }
+      );
+      if (res.success) {
+        // Optimistic local update so the user sees the tab change immediately
+        setConsultations(prev =>
+          prev.map(c =>
+            c.id === consultationId
+              ? { ...c, status, accepted_at: status === 'accepted' ? new Date().toISOString() : c.accepted_at, advocate_note: note ?? c.advocate_note }
+              : c
+          )
+        );
+        // Refresh stats and inbox
+        refreshConsultations();
+        setPendingAction(null);
+        setActionNote('');
+      } else {
+        setError(res.error ?? (isBn ? 'কর্মটি সম্পন্ন হয়নি।' : 'Action failed.'));
+      }
+    } finally {
+      setActionSaving(false);
+    }
+  }
+
+  const status = advocate?.verification_status ?? advocate?.verificationStatus ?? stats?.verificationStatus ?? 'pending';
 
   if (loading) {
     return (
       <div>
-        <div className="skeleton" style={{ height: '3.5rem', width: '35%', marginBottom: '2rem' }} />
+        <div className="skeleton" style={{ height: '3.5rem', width: '40%', marginBottom: '2rem' }} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-          {[1, 2, 3, 4].map(i => (
+          {[0, 1, 2, 3].map(i => (
             <div key={i} className="skeleton" style={{ height: '120px', borderRadius: '1rem' }} />
           ))}
         </div>
-        <div className="skeleton" style={{ height: '300px', borderRadius: '1.25rem' }} />
+        <div className="skeleton" style={{ height: '320px', borderRadius: '1.25rem' }} />
       </div>
     );
   }
 
-  const stats = dashboardData?.consultationStats;
-  const status = dashboardData?.verificationStatus || advocate?.verification_status || 'pending';
-  const completeness = dashboardData?.profileCompleteness ?? 0;
+  const pendingCount = Number(stats?.consultationStats?.pending_count ?? buckets.requests.length);
+  const activeCount = Number(stats?.consultationStats?.accepted_count ?? buckets.active.length);
+  const closedCount = Number(stats?.consultationStats?.closed_count ?? buckets.closed.length);
+  const declinedCount = Number(stats?.consultationStats?.declined_count ?? 0);
+  const completedThisMonth = closedCount; // Best available signal until "completed" is its own field.
+
+  const tabRows = buckets[tab];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {error && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#DC2626', padding: '1rem 1.25rem', borderRadius: '0.875rem', fontSize: '0.9rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          ⚠️ {error}
-        </div>
-      )}
       <style>{`
-        .welcome-card {
+        .ad-welcome {
           background: linear-gradient(135deg, #0D1B2A 0%, #1B2E43 100%);
           border-radius: 1.25rem;
-          padding: 2.5rem;
+          padding: 2.25rem 2.5rem;
           color: white;
           position: relative;
           overflow: hidden;
           box-shadow: 0 15px 40px rgba(13,27,42,0.15);
           border: 1px solid rgba(201,168,76,0.25);
         }
-        .welcome-pattern {
+        .ad-welcome::before {
+          content: '';
           position: absolute;
           inset: 0;
           background: radial-gradient(circle at 90% 10%, rgba(201,168,76,0.12) 0%, transparent 40%);
           pointer-events: none;
         }
-        .dashboard-grid {
+        .ad-alert {
+          border-radius: 0.875rem;
+          padding: 0.875rem 1.25rem;
+          display: flex;
+          align-items: center;
+          gap: 0.875rem;
+          font-weight: 500;
+        }
+        .ad-alert.pending { background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); color: #A0803A; }
+        .ad-alert.verified { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); color: #059669; }
+        .ad-alert.rejected { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #DC2626; }
+        .ad-stats {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap: 1.25rem;
         }
-        .stat-card {
+        .stat {
           background: white;
           border-radius: 1rem;
-          padding: 1.5rem;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+          padding: 1.25rem 1.4rem;
           border: 1px solid #E5E7EB;
           transition: all 0.2s;
         }
-        .stat-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 30px rgba(0,0,0,0.05);
-          border-color: #C9A84C;
+        .stat.gold {
+          border-color: rgba(201,168,76,0.5);
+          background: linear-gradient(135deg, rgba(201,168,76,0.06) 0%, white 65%);
+          box-shadow: 0 8px 20px rgba(201,168,76,0.15);
         }
-        .alert-banner {
-          border-radius: 0.75rem;
-          padding: 1rem 1.5rem;
-          display: flex;
+        .stat:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,27,42,0.06); }
+        .stat-label { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #6B7280; }
+        .stat-value { font-size: 2rem; font-weight: 800; color: #0D1B2A; margin-top: 0.45rem; }
+        .stat-foot { font-size: 0.78rem; color: #9CA3AF; margin-top: 0.5rem; }
+        .ad-tabs {
+          display: inline-flex;
+          background: #F3F4F6;
+          padding: 4px;
+          border-radius: 9999px;
+          gap: 2px;
+        }
+        .ad-tab {
+          padding: 0.55rem 1.2rem;
+          border-radius: 9999px;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #6B7280;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: inline-flex;
           align-items: center;
-          gap: 1rem;
+          gap: 6px;
+        }
+        .ad-tab.active {
+          background: white;
+          color: #0D1B2A;
+          box-shadow: 0 2px 6px rgba(13,27,42,0.08);
+        }
+        .ad-tab-count {
+          font-size: 0.7rem;
+          font-weight: 700;
+          padding: 1px 7px;
+          border-radius: 9999px;
+          background: rgba(13,27,42,0.08);
+          color: #0D1B2A;
+        }
+        .ad-tab.active .ad-tab-count { background: #C9A84C; color: #0D1B2A; }
+        .req-card {
+          background: white;
+          border-radius: 1rem;
+          padding: 1.25rem 1.5rem;
+          border: 1px solid #E5E7EB;
+          transition: all 0.2s;
+          display: flex;
+          flex-direction: column;
+          gap: 0.875rem;
+        }
+        .req-card:hover { border-color: rgba(201,168,76,0.4); box-shadow: 0 6px 18px rgba(13,27,42,0.06); }
+        .req-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .req-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+        .urg-chip {
+          font-size: 0.7rem;
+          font-weight: 700;
+          padding: 3px 9px;
+          border-radius: 9999px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          border: 1px solid;
+        }
+        .req-query {
+          color: #0D1B2A;
           font-weight: 500;
-          line-height: 1.5;
+          line-height: 1.55;
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
-        .alert-pending {
-          background: rgba(201, 168, 76, 0.08);
-          border: 1px solid rgba(201, 168, 76, 0.25);
-          color: #A0803A;
+        .req-actions { display: flex; gap: 0.625rem; justify-content: flex-end; flex-wrap: wrap; }
+        .req-note-overlay {
+          position: fixed; inset: 0;
+          background: rgba(13,27,42,0.55);
+          backdrop-filter: blur(4px);
+          z-index: 200;
+          display: flex; align-items: center; justify-content: center;
+          padding: 1rem;
         }
-        .alert-verified {
-          background: rgba(16, 185, 129, 0.08);
-          border: 1px solid rgba(16, 185, 129, 0.25);
-          color: #059669;
-        }
-        .alert-rejected {
-          background: rgba(239, 68, 68, 0.08);
-          border: 1px solid rgba(239, 68, 68, 0.25);
-          color: #DC2626;
-        }
-        .section-card {
+        .req-note-card {
           background: white;
           border-radius: 1.25rem;
-          padding: 2rem;
-          box-shadow: 0 4px 30px rgba(0,0,0,0.02);
-          border: 1px solid #E5E7EB;
+          padding: 1.75rem;
+          width: 100%;
+          max-width: 460px;
+          box-shadow: 0 20px 50px rgba(13,27,42,0.2);
         }
-        .list-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 1rem 0;
-          border-bottom: 1px solid #F3F4F6;
-        }
-        .list-row:last-child { border-bottom: none; }
       `}</style>
 
-      {/* Welcome Banner */}
-      <div className="welcome-card">
-        <div className="welcome-pattern" />
-        <span style={{
-          background: 'rgba(201,168,76,0.15)',
-          color: '#E2C475',
-          border: '1px solid rgba(201,168,76,0.3)',
-          padding: '4px 12px',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          display: 'inline-block',
-          marginBottom: '1rem',
-        }}>
-          {language === 'en' ? 'Console Access' : 'কনসোল অ্যাক্সেস'}
+      {/* Welcome */}
+      <div className="ad-welcome">
+        <span
+          style={{
+            background: 'rgba(201,168,76,0.15)',
+            color: '#E2C475',
+            border: '1px solid rgba(201,168,76,0.3)',
+            padding: '4px 12px',
+            borderRadius: '9999px',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            display: 'inline-block',
+            marginBottom: '0.875rem',
+          }}
+        >
+          {isBn ? 'কনসোল অ্যাক্সেস' : 'Console access'}
         </span>
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, margin: 0, fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? `Welcome back, Adv. ${advocate?.name || ''}` : `স্বাগতম, অ্যাডভোকেট ${advocate?.name || ''}`}
+        <h1
+          style={{
+            fontSize: '1.875rem',
+            fontWeight: 800,
+            margin: 0,
+            fontFamily: isBn ? 'var(--font-bangla)' : 'inherit',
+          }}
+        >
+          {isBn
+            ? `স্বাগতম, অ্যাড. ${advocate?.name ?? ''}`
+            : `Welcome back, Adv. ${advocate?.name ?? user?.email?.split('@')[0] ?? ''}`}
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.65)', marginTop: '0.5rem', marginBottom: 0 }}>
-          {language === 'en'
-            ? 'Manage your legal consultation requests, track verifications, and communicate with clients.'
-            : 'আপনার আইনি পরামর্শের অনুরোধগুলি পরিচালনা করুন, ভেরিফিকেশন ট্র্যাক করুন এবং মক্কেলদের সাথে চ্যাট করুন।'}
+          {isBn
+            ? 'অনুরোধ গ্রহণ করুন, সক্রিয় কেস ট্র্যাক করুন, এবং মক্কেলদের সাথে যোগাযোগ রাখুন।'
+            : 'Triage incoming requests, track active matters, and stay in touch with clients.'}
         </p>
       </div>
 
-      {/* Verification Status Banner Alerts */}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            color: '#DC2626',
+            padding: '0.875rem 1.25rem',
+            borderRadius: '0.875rem',
+            fontSize: '0.9rem',
+          }}
+        >
+          ⚠ {error}
+        </div>
+      )}
+
       {status === 'pending' && (
-        <div className="alert-banner alert-pending">
+        <div className="ad-alert pending">
           <span style={{ fontSize: '1.25rem' }}>⏳</span>
           <div>
-            <div style={{ fontWeight: 700 }}>{language === 'en' ? 'Verification Request Under Review' : 'যাচাইকরণের অনুরোধ প্রক্রিয়াধীন আছে'}</div>
-            <div style={{ fontSize: '0.875rem', marginTop: '0.15rem' }}>
-              {language === 'en'
-                ? 'Your professional profile is under review by the administrator. We will notify you once verified.'
-                : 'আপনার পেশাগত প্রোফাইলটি প্রশাসক দ্বারা পর্যালোচনা করা হচ্ছে। যাচাই করা হলে আমরা আপনাকে জানাব।'}
+            <div style={{ fontWeight: 700 }}>
+              {isBn ? 'যাচাইকরণ পর্যালোচনাধীন' : 'Verification under review'}
+            </div>
+            <div style={{ fontSize: '0.85rem', marginTop: 2 }}>
+              {isBn
+                ? 'যাচাই সম্পন্ন না হওয়া পর্যন্ত আপনি অনুরোধ গ্রহণ করতে পারবেন না।'
+                : 'You will start receiving consultation requests once the admin verifies your profile.'}
             </div>
           </div>
         </div>
       )}
 
       {status === 'rejected' && (
-        <div className="alert-banner alert-rejected">
-          <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+        <div className="ad-alert rejected">
+          <span style={{ fontSize: '1.25rem' }}>⚠</span>
           <div>
-            <div style={{ fontWeight: 700 }}>{language === 'en' ? 'Verification Rejected' : 'যাচাইকরণ প্রত্যাখ্যাত'}</div>
-            <div style={{ fontSize: '0.875rem', marginTop: '0.15rem' }}>
-              {language === 'en'
-                ? 'Your request was rejected. Please review your enrollment certificates in the Vault and resubmit.'
-                : 'আপনার অনুরোধটি প্রত্যাখ্যান করা হয়েছে। অনুগ্রহ করে ভল্টে আপনার প্রশংসাপত্র পরীক্ষা করুন এবং আবার জমা দিন।'}
+            <div style={{ fontWeight: 700 }}>
+              {isBn ? 'যাচাইকরণ প্রত্যাখ্যাত' : 'Verification rejected'}
+            </div>
+            <div style={{ fontSize: '0.85rem', marginTop: 2 }}>
+              {isBn
+                ? 'আপনার নথি পর্যালোচনা করে আবার জমা দিন।'
+                : 'Review your uploaded documents and resubmit.'}
             </div>
           </div>
         </div>
       )}
 
       {status === 'verified' && (
-        <div className="alert-banner alert-verified">
+        <div className="ad-alert verified">
           <span style={{ fontSize: '1.25rem' }}>✓</span>
-          <div>
-            <div style={{ fontWeight: 700 }}>{language === 'en' ? 'Profile Verified' : 'প্রোফাইল যাচাইকৃত'}</div>
-            <div style={{ fontSize: '0.875rem', marginTop: '0.15rem' }}>
-              {language === 'en'
-                ? 'Your profile is fully verified. You can now accept incoming consultations and interact with citizens.'
-                : 'আপনার প্রোফাইলটি সম্পূর্ণরূপে যাচাইকৃত। আপনি এখন পরামর্শের অনুরোধ গ্রহণ করতে এবং মক্কেলদের সাথে আলোচনা করতে পারেন।'}
-            </div>
+          <div style={{ fontWeight: 700 }}>
+            {isBn ? 'আপনার প্রোফাইল যাচাইকৃত। নতুন অনুরোধ গ্রহণ করতে পারবেন।' : 'Your profile is verified. You can accept new requests.'}
           </div>
         </div>
       )}
 
-      {/* Metrics Row */}
-      <div className="dashboard-grid">
-        <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ color: 'var(--color-gray-400)', fontSize: '0.825rem', fontWeight: 600, textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Pending Requests' : 'পেন্ডিং অনুরোধ'}
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-navy)', marginTop: '0.5rem' }}>
-              {Number(stats?.pending_count || 0)}
-            </div>
+      {/* Stat cards */}
+      <div className="ad-stats">
+        <div className={`stat ${pendingCount > 0 ? 'gold' : ''}`}>
+          <div className="stat-label">{isBn ? 'পেন্ডিং অনুরোধ' : 'Pending Requests'}</div>
+          <div className="stat-value">{pendingCount}</div>
+          <div className="stat-foot">
+            {pendingCount > 0
+              ? isBn ? 'নতুন অনুরোধ অপেক্ষমাণ' : 'New — awaiting your response'
+              : isBn ? 'নতুন কিছু নেই' : 'All caught up'}
           </div>
-          <Link href="/advocate/consultations?tab=pending" style={{ fontSize: '0.8rem', color: '#C9A84C', fontWeight: 700, textDecoration: 'none', marginTop: '1rem', display: 'block' }}>
-            {language === 'en' ? 'View incoming' : 'অনুরোধ দেখুন'} →
-          </Link>
         </div>
 
-        <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ color: 'var(--color-gray-400)', fontSize: '0.825rem', fontWeight: 600, textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Active Matters' : 'সক্রিয় কেস'}
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-navy)', marginTop: '0.5rem' }}>
-              {Number(stats?.accepted_count || 0)}
-            </div>
+        <div className="stat">
+          <div className="stat-label">{isBn ? 'সক্রিয় কেস' : 'Active Cases'}</div>
+          <div className="stat-value">{activeCount}</div>
+          <div className="stat-foot">
+            {isBn ? 'চলমান পরামর্শ' : 'Live consultations in progress'}
           </div>
-          <Link href="/advocate/consultations?tab=active" style={{ fontSize: '0.8rem', color: '#C9A84C', fontWeight: 700, textDecoration: 'none', marginTop: '1rem', display: 'block' }}>
-            {language === 'en' ? 'View active' : 'সক্রিয় কেস দেখুন'} →
-          </Link>
         </div>
 
-        <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ color: 'var(--color-gray-400)', fontSize: '0.825rem', fontWeight: 600, textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Declined Requests' : 'প্রত্যাখ্যাত অনুরোধ'}
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-navy)', marginTop: '0.5rem' }}>
-              {Number(stats?.declined_count || 0)}
-            </div>
+        <div className="stat">
+          <div className="stat-label">{isBn ? 'এ মাসে শেষ' : 'Completed (this month)'}</div>
+          <div className="stat-value">{completedThisMonth}</div>
+          <div className="stat-foot">
+            {declinedCount > 0
+              ? `${declinedCount} ${isBn ? 'প্রত্যাখ্যাত' : 'declined'}`
+              : isBn ? 'সমস্যা নেই' : 'No declines'}
           </div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-400)', marginTop: '1rem', display: 'block' }}>
-            Total processed
-          </span>
         </div>
 
-        {/* Profile Completeness Card */}
-        <div className="stat-card" style={{ gridColumn: 'span 1', background: '#FAF9F6', border: '1.5px dashed rgba(201,168,76,0.4)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase' }}>
-              {language === 'en' ? 'Profile Setup' : 'প্রোফাইল সেটআপ'}
-            </span>
-            <span style={{ fontWeight: 800, color: '#C9A84C', fontSize: '1.1rem' }}>{completeness}%</span>
+        <div className="stat">
+          <div className="stat-label">{isBn ? 'গড় রেটিং' : 'Average Rating'}</div>
+          <div className="stat-value">—</div>
+          <div className="stat-foot" style={{ fontStyle: 'italic' }}>
+            {isBn ? 'ফিডব্যাক শীঘ্রই' : 'Coming with feedback'}
           </div>
-          <div style={{ height: '6px', background: '#E5E7EB', borderRadius: '3px', margin: '0.75rem 0', overflow: 'hidden' }}>
-            <div style={{ height: '100%', background: '#C9A84C', width: `${completeness}%` }} />
-          </div>
-          <Link href="/advocate/onboarding" style={{ fontSize: '0.8rem', color: '#0D1B2A', fontWeight: 700, textDecoration: 'underline' }}>
-            {language === 'en' ? 'Edit details' : 'তথ্য পরিবর্তন'}
-          </Link>
         </div>
       </div>
 
-      {/* Recent Consultation Requests */}
-      <div className="section-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-navy)', margin: 0 }}>
-            {language === 'en' ? 'Recent Consultation Requests' : 'সাম্প্রতিক পরামর্শের অনুরোধ'}
-          </h3>
-          <Link href="/advocate/consultations" style={{ fontSize: '0.875rem', color: '#C9A84C', fontWeight: 600, textDecoration: 'none' }}>
-            {language === 'en' ? 'All Requests' : 'সব অনুরোধ'} →
+      {/* Tabs */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div role="tablist" className="ad-tabs">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'requests'}
+              className={`ad-tab ${tab === 'requests' ? 'active' : ''}`}
+              onClick={() => setTab('requests')}
+            >
+              {isBn ? 'অনুরোধ' : 'Requests'}
+              <span className="ad-tab-count">{buckets.requests.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'active'}
+              className={`ad-tab ${tab === 'active' ? 'active' : ''}`}
+              onClick={() => setTab('active')}
+            >
+              {isBn ? 'সক্রিয়' : 'Active'}
+              <span className="ad-tab-count">{buckets.active.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'closed'}
+              className={`ad-tab ${tab === 'closed' ? 'active' : ''}`}
+              onClick={() => setTab('closed')}
+            >
+              {isBn ? 'বন্ধ' : 'Closed'}
+              <span className="ad-tab-count">{buckets.closed.length}</span>
+            </button>
+          </div>
+          <Link href="/advocate/consultations" style={{ fontSize: '0.85rem', color: '#C9A84C', fontWeight: 700, textDecoration: 'none' }}>
+            {isBn ? 'বিস্তারিত পৃষ্ঠা' : 'Full inbox'} →
           </Link>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {recentConsultations.map(cons => (
-            <div key={cons.id} className="list-row">
-              <div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span className={`badge ${cons.status === 'pending' ? 'badge-navy' : cons.status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                    {cons.status}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-400)' }}>
-                    {new Date(cons.requested_at).toLocaleDateString(language === 'bn' ? 'bn-IN' : 'en-IN')}
-                  </span>
-                </div>
-                <div style={{
-                  fontSize: '0.925rem',
-                  fontWeight: 600,
-                  color: 'var(--color-navy)',
-                  marginTop: '0.35rem',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 1,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  maxWidth: '550px',
-                }}>
-                  {cons.query_text}
-                </div>
-              </div>
+        {tabRows.length === 0 ? (
+          <div
+            style={{
+              background: 'white',
+              border: '1px dashed #E5E7EB',
+              borderRadius: '1rem',
+              padding: '3.5rem 2rem',
+              textAlign: 'center',
+              color: '#9CA3AF',
+            }}
+          >
+            {tab === 'requests' && (isBn ? 'কোনো নতুন অনুরোধ নেই।' : 'No pending requests.')}
+            {tab === 'active' && (isBn ? 'কোনো সক্রিয় কেস নেই।' : 'No active consultations.')}
+            {tab === 'closed' && (isBn ? 'কোনো বন্ধ কেস নেই।' : 'No closed consultations yet.')}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '0.875rem' }}>
+            {tabRows.map(c => {
+              const urg = urgency(c.query_text);
+              const area = c.classification?.matterType;
+              const matterId = c.matter_id;
+              return (
+                <article key={c.id} className="req-card">
+                  <div className="req-head">
+                    <div className="req-chips">
+                      {tab === 'requests' && (
+                        <span
+                          className="urg-chip"
+                          style={{ color: urg.color, borderColor: urg.color, background: `${urg.color}10` }}
+                        >
+                          {urg.label}
+                        </span>
+                      )}
+                      {area && <span className="badge badge-navy">{area}</span>}
+                      <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
+                        {relativeTime(c.requested_at, isBn)}
+                      </span>
+                    </div>
+                    <span
+                      className={`badge ${
+                        c.status === 'accepted'
+                          ? 'badge-green'
+                          : c.status === 'pending'
+                            ? 'badge-gold'
+                            : 'badge-gray'
+                      }`}
+                    >
+                      {c.status}
+                    </span>
+                  </div>
 
-              <Link href={`/advocate/consultations/${cons.id}`} className="btn btn-ghost btn-sm" style={{ color: '#C9A84C', fontWeight: 700 }}>
-                {language === 'en' ? 'Review' : 'পর্যালোচনা'} →
-              </Link>
-            </div>
-          ))}
+                  <p
+                    className="req-query"
+                    style={{ fontFamily: c.query_language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
+                  >
+                    {c.query_text}
+                  </p>
 
-          {recentConsultations.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-gray-400)', fontStyle: 'italic' }}>
-              {language === 'en' ? 'No recent consultation requests.' : 'কোনো সাম্প্রতিক পরামর্শের অনুরোধ নেই।'}
-            </div>
-          )}
-        </div>
+                  <div className="req-actions">
+                    {matterId && (
+                      <Link
+                        href={`/matter/${matterId}`}
+                        className="btn btn-ghost btn-sm"
+                        style={{ color: '#0D1B2A' }}
+                      >
+                        {isBn ? 'বিষয় দেখুন' : 'View matter'}
+                      </Link>
+                    )}
+
+                    {tab === 'requests' && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-decline"
+                          onClick={() => {
+                            setPendingAction({ consultationId: c.id, action: 'decline' });
+                            setActionNote('');
+                          }}
+                          disabled={status !== 'verified'}
+                        >
+                          {isBn ? 'প্রত্যাখ্যান' : 'Decline'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-accept"
+                          onClick={() => performAction(c.id, 'accepted')}
+                          disabled={status !== 'verified' || actionSaving}
+                        >
+                          {isBn ? 'গ্রহণ করুন' : 'Accept'}
+                        </button>
+                      </>
+                    )}
+
+                    {tab === 'active' && (
+                      <Link href={`/chat/${c.id}`} className="btn-accept" style={{ textDecoration: 'none' }}>
+                        💬 {isBn ? 'চ্যাটে যান' : 'Enter chat'}
+                      </Link>
+                    )}
+
+                    {tab === 'closed' && (
+                      <span style={{ fontSize: '0.8rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                        {isBn ? 'কেবল পঠনযোগ্য' : 'Read-only'}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {pendingAction && (
+        <div className="req-note-overlay" onClick={e => e.target === e.currentTarget && setPendingAction(null)}>
+          <div className="req-note-card">
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0D1B2A', marginBottom: '0.75rem' }}>
+              {pendingAction.action === 'accept'
+                ? isBn ? 'অনুরোধ গ্রহণ করুন' : 'Accept this request'
+                : isBn ? 'অনুরোধ প্রত্যাখ্যান' : 'Decline this request'}
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '1rem' }}>
+              {isBn
+                ? 'মক্কেলের জন্য একটি ছোট নোট (ঐচ্ছিক) যোগ করতে পারেন।'
+                : 'Add a short note for the citizen (optional).'}
+            </p>
+            <textarea
+              className="input textarea"
+              rows={3}
+              maxLength={300}
+              value={actionNote}
+              onChange={e => setActionNote(e.target.value)}
+              placeholder={
+                pendingAction.action === 'accept'
+                  ? isBn ? 'যেমন: কাল সকাল ১০টায় কথা বলব।' : 'e.g. I will reach out tomorrow morning at 10.'
+                  : isBn ? 'প্রত্যাখ্যানের কারণ (ঐচ্ছিক)' : 'Reason for declining (optional)'
+              }
+              style={{ minHeight: '5rem' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setPendingAction(null)}
+                disabled={actionSaving}
+              >
+                {isBn ? 'বাতিল' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                className={pendingAction.action === 'accept' ? 'btn-accept' : 'btn-decline'}
+                onClick={() =>
+                  performAction(
+                    pendingAction.consultationId,
+                    pendingAction.action === 'accept' ? 'accepted' : 'declined',
+                    actionNote.trim() || undefined
+                  )
+                }
+                disabled={actionSaving}
+              >
+                {actionSaving
+                  ? isBn ? 'অপেক্ষা…' : 'Working…'
+                  : pendingAction.action === 'accept'
+                    ? isBn ? 'গ্রহণ করুন' : 'Accept'
+                    : isBn ? 'প্রত্যাখ্যান করুন' : 'Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

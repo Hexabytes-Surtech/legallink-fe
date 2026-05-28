@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api/client';
@@ -19,7 +18,6 @@ type Step = 'email' | 'otp';
 export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage, role = 'citizen' }: OTPModalProps) {
   const { t } = useLanguage();
   const { login } = useAuth();
-  const router = useRouter();
 
   const [step, setStep] = useState<Step>('email');
   const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup');
@@ -135,11 +133,9 @@ export function OTPModal({ onClose, onSuccess, redirectTo, contextMessage, role 
     });
     setLoading(false);
     if (res.success && res.data) {
-      login(res.data);
+      // AuthContext handles role-aware redirect (or honours redirectTo override).
+      login(res.data, redirectTo);
       onSuccess?.();
-      if (redirectTo) {
-        router.push(redirectTo);
-      }
       onClose();
     } else {
       setError(res.error ?? t('auth.error.invalid'));

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Advocate } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface AdvocateCardProps {
   advocate: Advocate;
   onRequestConsultation: (advocate: Advocate) => void;
+  showViewProfile?: boolean;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -24,7 +26,7 @@ const PRACTICE_LABELS: Record<string, string> = {
   labour: 'Labour',
 };
 
-export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardProps) {
+export function AdvocateCard({ advocate, onRequestConsultation, showViewProfile = false }: AdvocateCardProps) {
   const { t } = useLanguage();
   const { isAuthenticated } = useAuth();
 
@@ -33,6 +35,8 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
     .map(n => n[0])
     .slice(0, 2)
     .join('');
+
+  const advocateId = advocate.id ?? advocate.advocate_id;
 
   return (
     <>
@@ -147,7 +151,16 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
       `}</style>
       <div className="advocate-card">
         <div className="advocate-card-header">
-          <div className="advocate-avatar">{initials}</div>
+          <div
+            className="advocate-avatar"
+            style={
+              advocate.avatar_url
+                ? { backgroundImage: `url(${advocate.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                : undefined
+            }
+          >
+            {!advocate.avatar_url && initials}
+          </div>
           <div className="advocate-name-block">
             <div className="advocate-name">{advocate.name}</div>
             <div className="advocate-enrolment">{advocate.barEnrolmentNumber ?? advocate.bar_enrolment_number}</div>
@@ -194,6 +207,15 @@ export function AdvocateCard({ advocate, onRequestConsultation }: AdvocateCardPr
         </div>
 
         <div className="advocate-card-footer">
+          {showViewProfile && advocateId && (
+            <Link
+              href={`/advocates/${advocateId}`}
+              className="btn btn-secondary"
+              style={{ flex: 1, fontSize: '0.875rem', textDecoration: 'none', textAlign: 'center' }}
+            >
+              View Profile
+            </Link>
+          )}
           <button
             className="btn btn-primary"
             style={{ flex: 1, fontSize: '0.875rem' }}

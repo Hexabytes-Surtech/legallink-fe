@@ -1,861 +1,978 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api/client';
-import { USE_MOCK, mockDelay } from '@/data/mock';
-import type { Advocate } from '@/types';
+import type { Advocate, OnboardingPayload } from '@/types';
+
+// ---------------------------------------------------------------------------
+// BCI 2008 compliant onboarding wizard — 4 steps.
+// Master plan §5.3. Fields here are limited to what the BCI 2008 amendment
+// permits an advocate to advertise; do not add fee, success rate, etc.
+// ---------------------------------------------------------------------------
 
 interface DocumentInfo {
   id: string;
   file_path: string;
   file_type: string;
   uploaded_at: string;
+  label?: string;
 }
 
-export default function OnboardingWizardPage() {
+// 22 State Bar Councils (the BCI's recognised list).
+const STATE_BARS = [
+  'Andhra Pradesh',
+  'Assam, Nagaland, Mizoram, Manipur, Tripura, Arunachal Pradesh, Sikkim',
+  'Bihar',
+  'Chhattisgarh',
+  'Delhi',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jammu & Kashmir and Ladakh',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Madhya Pradesh',
+  'Maharashtra & Goa',
+  'Odisha',
+  'Punjab and Haryana',
+  'Rajasthan',
+  'Tamil Nadu & Puducherry',
+  'Telangana',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal',
+];
+
+const PRACTICE_AREAS = [
+  { value: 'criminal', labelEn: 'Criminal', labelBn: 'ফৌজদারি' },
+  { value: 'civil', labelEn: 'Civil', labelBn: 'দেওয়ানি' },
+  { value: 'family', labelEn: 'Family', labelBn: 'পারিবারিক' },
+  { value: 'labour', labelEn: 'Labour', labelBn: 'শ্রম' },
+  { value: 'tenancy', labelEn: 'Tenancy', labelBn: 'ভাড়াটে' },
+  { value: 'traffic', labelEn: 'Traffic', labelBn: 'যানবাহন' },
+  { value: 'corporate', labelEn: 'Corporate', labelBn: 'কর্পোরেট' },
+  { value: 'consumer', labelEn: 'Consumer', labelBn: 'ভোক্তা' },
+  { value: 'constitutional', labelEn: 'Constitutional', labelBn: 'সাংবিধানিক' },
+];
+
+const LANGUAGES = [
+  { value: 'bn', labelEn: 'Bengali', labelBn: 'বাংলা' },
+  { value: 'en', labelEn: 'English', labelBn: 'ইংরেজি' },
+  { value: 'hi', labelEn: 'Hindi', labelBn: 'হিন্দি' },
+];
+
+// Phase 1: West Bengal districts only (per master plan §5.3).
+const WB_DISTRICTS = [
+  'Kolkata',
+  'Howrah',
+  'Hooghly',
+  'North 24 Parganas',
+  'South 24 Parganas',
+  'Nadia',
+  'Murshidabad',
+  'Birbhum',
+  'Purba Bardhaman',
+  'Paschim Bardhaman',
+  'Bankura',
+  'Purulia',
+  'Jhargram',
+  'Paschim Medinipur',
+  'Purba Medinipur',
+  'Malda',
+  'Uttar Dinajpur',
+  'Dakshin Dinajpur',
+  'Jalpaiguri',
+  'Alipurduar',
+  'Darjeeling',
+  'Kalimpong',
+  'Cooch Behar',
+];
+
+// Phrases the BCI explicitly disallows in advocate-facing copy (Rule 36).
+const BCI_BANNED_PHRASES = [
+  'best lawyer',
+  'top rated',
+  'guaranteed',
+  'guarantee',
+  'fee',
+  'fees',
+  '₹',
+  'rs.',
+  'win',
+  'won',
+  'success rate',
+];
+
+const BIO_MAX = 300;
+const CURRENT_YEAR = new Date().getFullYear();
+
+const STEP_LABELS = [
+  { en: 'Identity', bn: 'পরিচয়' },
+  { en: 'Bar Council', bn: 'বার কাউন্সিল' },
+  { en: 'Practice', bn: 'অনুশীলন' },
+  { en: 'Documents', bn: 'নথিপত্র' },
+];
+
+function bioWarnings(bio: string): string[] {
+  if (!bio) return [];
+  const lower = bio.toLowerCase();
+  return BCI_BANNED_PHRASES.filter(p => lower.includes(p));
+}
+
+function phoneIsValid(phone: string): boolean {
+  // Accepts 10-digit Indian numbers, optionally prefixed with +91 / 0
+  return /^(\+91|0)?[6-9]\d{9}$/.test(phone.replace(/\s|-/g, ''));
+}
+
+export default function AdvocateOnboardingPage() {
   const { language } = useLanguage();
   const { user } = useAuth();
   const router = useRouter();
+  const isBn = language === 'bn';
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Form Fields State
+  // Step 1
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
 
+  // Step 2
   const [barNumber, setBarNumber] = useState('');
   const [stateBar, setStateBar] = useState('West Bengal');
-
-  const [practiceAreas, setPracticeAreas] = useState<string[]>([]);
+  const [yearOfEnrolment, setYearOfEnrolment] = useState<string>('');
   const [courts, setCourts] = useState<string[]>([]);
   const [newCourt, setNewCourt] = useState('');
+
+  // Step 3
+  const [practiceAreas, setPracticeAreas] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>(['en']);
   const [districts, setDistricts] = useState<string[]>([]);
+  const [bio, setBio] = useState('');
+  const [availability, setAvailability] = useState<'online' | 'in_person' | 'both'>('both');
 
+  // Step 4
   const [uploadedDocs, setUploadedDocs] = useState<DocumentInfo[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
-  // Practice Areas & District Options
-  const practiceAreaOptions = [
-    { value: 'family', labelEn: 'Family Law', labelBn: 'পারিবারিক আইন' },
-    { value: 'criminal', labelEn: 'Criminal Law', labelBn: 'ফৌজদারি আইন' },
-    { value: 'property', labelEn: 'Property Law', labelBn: 'সম্পত্তি আইন' },
-    { value: 'tenancy', labelEn: 'Tenancy & Housing', labelBn: 'ভাড়াটে ও আবাসন আইন' },
-    { value: 'civil', labelEn: 'Civil Law', labelBn: 'দেওয়ানি আইন' },
-    { value: 'consumer', labelEn: 'Consumer Protection', labelBn: 'ভোক্তা অধিকার' },
-    { value: 'labour', labelEn: 'Labour & Employment', labelBn: 'শ্রম ও কর্মসংস্থান' },
-    { value: 'corporate', labelEn: 'Corporate Law', labelBn: 'কর্পোরেট আইন' },
-    { value: 'tax', labelEn: 'Tax Law', labelBn: 'কর আইন' },
-    { value: 'motor_vehicle', labelEn: 'Motor Vehicle Disputes', labelBn: 'মোটর যান বিতর্ক' },
-    { value: 'land_disputes', labelEn: 'Land Disputes', labelBn: 'ভূমি বিরোধ' },
-  ];
+  const populate = useCallback(
+    (data: Advocate) => {
+      setName(data.name ?? '');
+      setPhone(data.phone ?? '');
+      setAddress(data.address ?? '');
+      setBarNumber(data.bar_enrolment_number ?? data.barEnrolmentNumber ?? '');
+      setStateBar(data.state_bar ?? data.stateBar ?? 'West Bengal');
+      const year = data.year_of_enrolment ?? data.yearOfEnrolment;
+      if (year) setYearOfEnrolment(String(year));
+      setPracticeAreas(data.practice_areas ?? data.practiceAreas ?? []);
+      setCourts(data.courts ?? []);
+      setLanguages(data.languages?.length ? data.languages : ['en']);
+      setDistricts(data.districts ?? []);
+      setBio(data.bio ?? '');
+      const mode = data.availability_mode ?? data.availabilityMode;
+      if (mode === 'online' || mode === 'in_person' || mode === 'both') setAvailability(mode);
+    },
+    []
+  );
 
-  const districtOptions = [
-    { value: 'kolkata', labelEn: 'Kolkata', labelBn: 'কলকাতা' },
-    { value: 'howrah', labelEn: 'Howrah', labelBn: 'হাওড়া' },
-    { value: 'north_24_parganas', labelEn: 'North 24 Parganas', labelBn: 'উত্তর ২৪ পরগণা' },
-    { value: 'south_24_parganas', labelEn: 'South 24 Parganas', labelBn: 'দক্ষিণ ২৪ পরগণা' },
-    { value: 'hooghly', labelEn: 'Hooghly', labelBn: 'হুগলি' },
-    { value: 'burdwan', labelEn: 'Burdwan', labelBn: 'বর্ধমান' },
-    { value: 'murshidabad', labelEn: 'Murshidabad', labelBn: 'মুর্শিদাবাদ' },
-    { value: 'nadia', labelEn: 'Nadia', labelBn: 'নদীয়া' },
-    { value: 'medinipur', labelEn: 'Medinipur', labelBn: 'মেদিনীপুর' },
-    { value: 'bankura', labelEn: 'Bankura', labelBn: 'বাঁকুড়া' },
-  ];
-
-  const stateBarOptions = [
-    'West Bengal',
-    'Delhi',
-    'Maharashtra & Goa',
-    'Karnataka',
-    'Tamil Nadu',
-    'Uttar Pradesh',
-  ];
-
-  const languageOptions = [
-    { value: 'en', labelEn: 'English', labelBn: 'ইংরেজি' },
-    { value: 'bn', labelEn: 'Bengali', labelBn: 'বাংলা' },
-    { value: 'hi', labelEn: 'Hindi', labelBn: 'হিন্দি' },
-  ];
-
-  const populateState = useCallback((data: Advocate) => {
-    setName(data.name || '');
-    setPhone(data.phone || '');
-    setAddress(data.address || '');
-    setEmail(data.advocate_email || data.email || user?.email || '');
-    setBarNumber(data.bar_enrolment_number || data.barEnrolmentNumber || '');
-    setStateBar(data.state_bar || data.stateBar || 'West Bengal');
-    setPracticeAreas(data.practice_areas || data.practiceAreas || []);
-    setCourts(data.courts || []);
-    setLanguages(data.languages || ['en']);
-    setDistricts(data.districts || []);
-  }, [user]);
-
-  // 1. Fetch existing profile on mount
   useEffect(() => {
-    async function loadProfile() {
+    let cancelled = false;
+    async function load() {
       setLoading(true);
       setError('');
       try {
-        if (USE_MOCK) {
-          await mockDelay(500);
-          const cached = localStorage.getItem('mock_advocate_profile');
-          if (cached) {
-            const data = JSON.parse(cached) as Advocate;
-            populateState(data);
-          } else {
-            // default mock values from logged-in user
-            setEmail(user?.email || '');
-          }
-
-          const cachedDocs = localStorage.getItem('mock_advocate_documents');
-          if (cachedDocs) {
-            setUploadedDocs(JSON.parse(cachedDocs));
-          }
-        } else {
-          // Real mode
-          const res = await apiClient<Advocate>('/advocate/me');
-          if (res.success && res.data) {
-            populateState(res.data);
-          }
-
-          const docsRes = await apiClient<DocumentInfo[]>('/advocate/documents');
-          if (docsRes.success && docsRes.data) {
-            setUploadedDocs(docsRes.data);
-          }
-        }
+        const [me, docs] = await Promise.all([
+          apiClient<Advocate>('/advocate/me'),
+          apiClient<DocumentInfo[]>('/advocate/documents'),
+        ]);
+        if (cancelled) return;
+        if (me.success && me.data) populate(me.data);
+        if (docs.success && docs.data) setUploadedDocs(docs.data);
       } catch {
-        setError(language === 'en' ? 'Failed to fetch existing profile details' : 'বিদ্যমান প্রোফাইলের বিবরণ পেতে ব্যর্থ হয়েছে');
+        if (!cancelled) {
+          setError(isBn ? 'বিদ্যমান প্রোফাইল লোড করা যায়নি।' : 'Failed to load existing profile.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+    if (user) load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, populate, isBn]);
 
-    if (user) {
-      loadProfile();
+  function validateStep(target: number): string | null {
+    if (target >= 1) {
+      if (!name.trim()) return isBn ? 'পূর্ণ নাম দিন।' : 'Full name is required.';
+      if (!phoneIsValid(phone)) return isBn ? 'বৈধ মোবাইল নম্বর দিন।' : 'Enter a valid 10-digit Indian mobile number.';
     }
-  }, [user, language, populateState]);
-
-  // Calculate completeness score
-  const completenessDetails = [
-    { name: 'Name', checked: !!name },
-    { name: 'Phone', checked: !!phone },
-    { name: 'Email', checked: !!email },
-    { name: 'Address', checked: !!address },
-    { name: 'Bar Enrolment Number', checked: !!barNumber },
-    { name: 'State Bar Council', checked: !!stateBar },
-    { name: 'Practice Areas', checked: practiceAreas.length > 0 },
-    { name: 'Courts', checked: courts.length > 0 },
-    { name: 'Languages Known', checked: languages.length > 0 },
-    { name: 'Districts Served', checked: districts.length > 0 },
-    { name: 'Verification Certificates', checked: uploadedDocs.length > 0 },
-  ];
-
-  const completedCount = completenessDetails.filter(d => d.checked).length;
-  const completenessScore = Math.round((completedCount / completenessDetails.length) * 100);
-
-  // Progressive Save
-  async function saveProgress(targetStep?: number) {
-    setError('');
-    setSaving(true);
-    try {
-      const payload: Partial<Advocate> = {
-        name,
-        phone,
-        address,
-        email,
-        advocate_email: email,
-        barEnrolmentNumber: barNumber,
-        bar_enrolment_number: barNumber,
-        stateBar,
-        state_bar: stateBar,
-        practiceAreas,
-        practice_areas: practiceAreas,
-        courts,
-        languages,
-        districts,
-      };
-
-      if (USE_MOCK) {
-        await mockDelay(300);
-        // Save to localStorage
-        const cached = localStorage.getItem('mock_advocate_profile');
-        const existing = cached ? JSON.parse(cached) : {};
-        const merged = {
-          ...existing,
-          ...payload,
-          verification_status: existing.verification_status || 'pending',
-        };
-        localStorage.setItem('mock_advocate_profile', JSON.stringify(merged));
-      } else {
-        const res = await apiClient<Advocate>('/advocate/profile', {
-          method: 'PUT',
-          body: payload,
-        });
-        if (!res.success) {
-          throw new Error(res.error || 'Failed to update profile');
-        }
+    if (target >= 2) {
+      if (!barNumber.trim()) return isBn ? 'বার কাউন্সিল নথিভুক্তি নম্বর দিন।' : 'Bar enrolment number is required.';
+      if (!stateBar) return isBn ? 'রাজ্য বার কাউন্সিল বেছে নিন।' : 'Select a State Bar Council.';
+      const year = Number(yearOfEnrolment);
+      if (!year || year < 1950 || year > CURRENT_YEAR) {
+        return isBn
+          ? `নথিভুক্তির বছর ১৯৫০ থেকে ${CURRENT_YEAR}-এর মধ্যে হতে হবে।`
+          : `Year of enrolment must be between 1950 and ${CURRENT_YEAR}.`;
       }
-
-      // Notify Sidebar Layout to update profile details dynamically
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('advocate-profile-updated'));
-      }
-
-      if (targetStep) {
-        setStep(targetStep);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save progress.');
-    } finally {
-      setSaving(false);
+      if (courts.length === 0) return isBn ? 'অন্তত একটি আদালত যুক্ত করুন।' : 'Add at least one court of practice.';
     }
+    if (target >= 3) {
+      if (practiceAreas.length === 0) return isBn ? 'অন্তত একটি অনুশীলনের ক্ষেত্র বেছে নিন।' : 'Select at least one practice area.';
+      if (languages.length === 0) return isBn ? 'অন্তত একটি ভাষা বেছে নিন।' : 'Select at least one language.';
+      if (districts.length === 0) return isBn ? 'অন্তত একটি জেলা বেছে নিন।' : 'Select at least one district.';
+      if (bio.length > BIO_MAX) return isBn ? `সংক্ষিপ্ত পরিচয় সর্বোচ্চ ${BIO_MAX} অক্ষর।` : `Bio must be ${BIO_MAX} characters or fewer.`;
+      const banned = bioWarnings(bio);
+      if (banned.length > 0) {
+        return isBn
+          ? `BCI Rule 36 অনুযায়ী এই শব্দগুলি ব্যবহার করা যাবে না: ${banned.join(', ')}`
+          : `BCI Rule 36 prohibits these terms in your bio: ${banned.join(', ')}`;
+      }
+    }
+    return null;
   }
 
-  // Upload CoP Certificate
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setError('');
-    setUploadingDoc(true);
-
-    const file = files[0];
-    try {
-      if (USE_MOCK) {
-        await mockDelay(600);
-        const newDoc: DocumentInfo = {
-          id: 'mock-doc-' + Date.now(),
-          file_path: URL.createObjectURL(file),
-          file_type: file.type,
-          uploaded_at: new Date().toISOString(),
-        };
-        const updated = [...uploadedDocs, newDoc];
-        setUploadedDocs(updated);
-        localStorage.setItem('mock_advocate_documents', JSON.stringify(updated));
-      } else {
-        const formData = new FormData();
-        formData.append('document', file);
-
-        const res = await apiClient<DocumentInfo>('/advocate/documents', {
-          method: 'POST',
-          formData,
-        });
-
-        if (res.success && res.data) {
-          setUploadedDocs(prev => [...prev, res.data!]);
-        } else {
-          throw new Error(res.error || 'Failed to upload document');
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error uploading file.');
-    } finally {
-      setUploadingDoc(false);
-      e.target.value = ''; // Reset file input
-    }
-  }
-
-  // Delete uploaded document
-  async function handleDeleteDoc(docId: string) {
-    setError('');
-    try {
-      if (USE_MOCK) {
-        await mockDelay(300);
-        const updated = uploadedDocs.filter(d => d.id !== docId);
-        setUploadedDocs(updated);
-        localStorage.setItem('mock_advocate_documents', JSON.stringify(updated));
-      } else {
-        // Assume API has a DELETE /advocate/documents/:id endpoint, or we ignore it if it doesn't.
-        // If not in API_REFERENCE, let's keep it locally updated.
-        // Actually, API reference does not list a DELETE document endpoint, so we can just mock-delete or skip the call.
-        const updated = uploadedDocs.filter(d => d.id !== docId);
-        setUploadedDocs(updated);
-      }
-    } catch {
-      setError('Failed to delete document.');
-    }
-  }
-
-  // Submit profile for verification
-  async function handleSubmitVerification() {
-    if (completenessScore < 80) {
-      setError(language === 'en' 
-        ? 'Your profile completeness is too low. Please fill in all fields (minimum 80%).' 
-        : 'আপনার প্রোফাইলের সম্পূর্ণতা খুব কম। অনুগ্রহ করে সব তথ্য পূরণ করুন (ন্যূনতম ৮০%)।');
+  async function saveAndAdvance(targetStep: number) {
+    const err = validateStep(step);
+    if (err) {
+      setError(err);
       return;
     }
-
     setError('');
     setSaving(true);
     try {
-      if (USE_MOCK) {
-        await mockDelay(800);
-        const cached = localStorage.getItem('mock_advocate_profile');
-        const profile = cached ? JSON.parse(cached) : {};
-        profile.verification_status = 'pending';
-        localStorage.setItem('mock_advocate_profile', JSON.stringify(profile));
-      } else {
-        const res = await apiClient('/advocate/submit-verification', {
-          method: 'POST',
-        });
-        if (!res.success) {
-          throw new Error(res.error || 'Failed to submit profile for verification.');
-        }
+      const payload: Partial<OnboardingPayload> = {
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        bar_enrolment_number: barNumber.trim(),
+        state_bar: stateBar,
+        year_of_enrolment: Number(yearOfEnrolment) || undefined,
+        courts,
+        practice_areas: practiceAreas,
+        languages,
+        districts,
+        bio: bio.trim(),
+        availability_mode: availability,
+      };
+      const res = await apiClient('/advocate/profile', { method: 'PUT', body: payload });
+      if (!res.success) {
+        throw new Error(res.error ?? 'Failed to save progress.');
       }
-
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('advocate-profile-updated'));
       }
-
-      setSuccessMsg(language === 'en' 
-        ? 'Your professional profile has been submitted for admin verification. Redirecting to dashboard...'
-        : 'আপনার পেশাগত প্রোফাইলটি অ্যাডমিন ভেরিফিকেশনের জন্য জমা দেওয়া হয়েছে। ড্যাশবোর্ডে রিডাইরেক্ট করা হচ্ছে...');
-      
-      setTimeout(() => {
-        router.push('/advocate/dashboard');
-      }, 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Submission failed.');
+      setStep(targetStep);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save progress.');
     } finally {
       setSaving(false);
     }
   }
 
-  // Manage Practice Areas Selection
-  const togglePracticeArea = (value: string) => {
-    setPracticeAreas(prev =>
-      prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]
-    );
-  };
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, label: string) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError(isBn ? 'ফাইল সর্বোচ্চ ৫MB হতে হবে।' : 'File must be 5 MB or smaller.');
+      return;
+    }
+    setError('');
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('document', file);
+      fd.append('label', label);
+      const res = await apiClient<DocumentInfo>('/advocate/documents', { method: 'POST', formData: fd });
+      if (res.success && res.data) {
+        setUploadedDocs(prev => [...prev, { ...res.data!, label }]);
+      } else {
+        throw new Error(res.error ?? 'Upload failed.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed.');
+    } finally {
+      setUploadingDoc(false);
+    }
+  }
 
-  // Manage Districts Selection
-  const toggleDistrict = (value: string) => {
-    setDistricts(prev =>
-      prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]
-    );
-  };
+  async function handleSubmitForVerification() {
+    const err = validateStep(3);
+    if (err) {
+      setError(err);
+      return;
+    }
+    if (uploadedDocs.length === 0) {
+      setError(
+        isBn
+          ? 'যাচাইকরণের জন্য আপনার Certificate of Practice আপলোড করুন।'
+          : 'Upload your Certificate of Practice before submitting for verification.'
+      );
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await apiClient('/advocate/submit-verification', { method: 'POST' });
+      if (!res.success) throw new Error(res.error ?? 'Submission failed.');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('advocate-profile-updated'));
+      }
+      setSuccess(
+        isBn
+          ? 'আপনার প্রোফাইল যাচাইকরণের জন্য জমা দেওয়া হয়েছে। সাধারণত ২৪–৪৮ ঘণ্টার মধ্যে পর্যালোচনা সম্পন্ন হয়।'
+          : 'Your profile is submitted. Reviews typically complete within 24–48 hours.'
+      );
+      setTimeout(() => router.push('/advocate/dashboard'), 2500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Submission failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
-  // Manage Languages Selection
-  const toggleLanguageOption = (value: string) => {
-    setLanguages(prev =>
-      prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]
-    );
-  };
+  function toggleIn(list: string[], value: string, setter: (v: string[]) => void) {
+    setter(list.includes(value) ? list.filter(v => v !== value) : [...list, value]);
+  }
 
-  // Manage Courts List
-  const addCourt = () => {
-    if (newCourt.trim() && !courts.includes(newCourt.trim())) {
-      setCourts(prev => [...prev, newCourt.trim()]);
+  function addCourt() {
+    const trimmed = newCourt.trim();
+    if (trimmed && !courts.includes(trimmed)) {
+      setCourts(prev => [...prev, trimmed]);
       setNewCourt('');
     }
-  };
-
-  const removeCourt = (index: number) => {
-    setCourts(prev => prev.filter((_, idx) => idx !== index));
-  };
+  }
 
   if (loading) {
     return (
-      <div style={{ padding: '2rem 0', maxWidth: '800px', margin: '0 auto' }}>
+      <div style={{ maxWidth: 820, margin: '0 auto' }}>
         <div className="skeleton" style={{ height: '3rem', width: '40%', marginBottom: '2rem' }} />
-        <div className="skeleton" style={{ height: '200px', borderRadius: '1rem', marginBottom: '1.5rem' }} />
-        <div className="skeleton" style={{ height: '60px', borderRadius: '0.5rem' }} />
+        <div className="skeleton" style={{ height: '500px', borderRadius: '1.25rem' }} />
       </div>
     );
   }
 
+  const bannedHits = bioWarnings(bio);
+
   return (
-    <div style={{ maxWidth: '850px', margin: '0 auto', paddingBottom: '4rem' }}>
+    <div style={{ maxWidth: 860, margin: '0 auto', paddingBottom: '4rem' }}>
       <style>{`
-        .wizard-card {
+        .wiz-header { margin-bottom: 1.75rem; }
+        .wiz-title { font-size: 1.75rem; font-weight: 800; color: #0D1B2A; letter-spacing: -0.01em; }
+        .wiz-sub { color: #6B7280; font-size: 1.0625rem; margin-top: 0.25rem; }
+        .wiz-card {
           background: white;
           border-radius: 1.25rem;
-          padding: 2.5rem;
+          padding: 2.25rem;
           box-shadow: 0 10px 30px rgba(0,0,0,0.04);
           border: 1px solid rgba(201,168,76,0.15);
         }
-        .wizard-steps {
-          display: flex;
-          justify-content: space-between;
+        .wiz-rail {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
           margin-bottom: 2.5rem;
-          position: relative;
         }
-        .wizard-steps::before {
-          content: '';
-          position: absolute;
-          top: 14px;
-          left: 5%;
-          right: 5%;
-          height: 3px;
-          background: rgba(13,27,42,0.1);
-          z-index: 1;
-        }
-        .step-bubble {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: white;
-          border: 3px solid rgba(13,27,42,0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 700;
-          font-size: 0.875rem;
-          z-index: 2;
-          color: #6B7280;
-          transition: all 0.3s;
-        }
-        .step-bubble.active {
-          border-color: #0D1B2A;
-          background: #0D1B2A;
-          color: white;
-          box-shadow: 0 0 0 5px rgba(13,27,42,0.15);
-        }
-        .step-bubble.completed {
-          border-color: #C9A84C;
-          background: #C9A84C;
-          color: #0D1B2A;
-        }
-        .step-label {
-          position: absolute;
-          top: 38px;
-          font-size: 0.75rem;
-          font-weight: 700;
-          color: #6B7280;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          white-space: nowrap;
-          transform: translateX(-35%);
-        }
-        .step-bubble.active + .step-label {
-          color: #0D1B2A;
-        }
-        .form-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1.5rem;
-          margin-bottom: 1.5rem;
-        }
-        @media (max-width: 600px) {
-          .form-grid { grid-template-columns: 1fr; }
-          .wizard-steps { display: none; }
-        }
-        .checkbox-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.75rem;
-          margin-top: 0.5rem;
-        }
-        .checkbox-card {
+        .wiz-rail-item {
+          padding: 14px 16px;
+          border-radius: 14px;
           border: 1.5px solid #E5E7EB;
-          border-radius: 0.75rem;
-          padding: 0.75rem 1rem;
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          cursor: pointer;
+          background: white;
           transition: all 0.2s;
-          font-weight: 500;
-          font-size: 0.9rem;
         }
-        .checkbox-card.selected {
+        .wiz-rail-item.active {
           border-color: #C9A84C;
-          background: rgba(201,168,76,0.06);
+          background: rgba(201,168,76,0.08);
+          box-shadow: 0 6px 14px rgba(201,168,76,0.12);
+        }
+        .wiz-rail-item.done {
+          border-color: rgba(13,27,42,0.18);
+          background: #F9FAFB;
+        }
+        .wiz-rail-step { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9CA3AF; }
+        .wiz-rail-item.active .wiz-rail-step { color: #A0803A; }
+        .wiz-rail-item.done .wiz-rail-step { color: #059669; }
+        .wiz-rail-label { font-weight: 700; color: #0D1B2A; margin-top: 4px; }
+        .wiz-section-title {
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #0D1B2A;
+          padding-bottom: 0.5rem;
+          margin-bottom: 1.5rem;
+          border-bottom: 1px solid #E5E7EB;
+        }
+        .wiz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+        @media (max-width: 640px) { .wiz-grid { grid-template-columns: 1fr; } .wiz-rail { grid-template-columns: 1fr 1fr; } }
+        .wiz-field-label {
+          display: block;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #374151;
+          margin-bottom: 0.4rem;
+        }
+        .wiz-field-hint { font-size: 0.75rem; color: #6B7280; margin-top: 0.3rem; }
+        .wiz-chip-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+          gap: 8px;
+        }
+        .wiz-chip {
+          padding: 8px 12px;
+          border: 1.5px solid #E5E7EB;
+          border-radius: 999px;
+          background: white;
+          color: #374151;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          text-align: center;
+          transition: all 0.18s ease;
+          user-select: none;
+        }
+        .wiz-chip:hover { border-color: rgba(201,168,76,0.5); }
+        .wiz-chip.selected {
+          border-color: #C9A84C;
+          background: rgba(201,168,76,0.12);
           color: #0D1B2A;
         }
-        .court-badge {
-          background: rgba(13,27,42,0.05);
-          border: 1px solid rgba(13,27,42,0.1);
-          color: #0D1B2A;
-          padding: 6px 12px;
-          border-radius: 9999px;
-          font-size: 0.85rem;
+        .court-tag {
           display: inline-flex;
           align-items: center;
           gap: 6px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: rgba(13,27,42,0.06);
+          border: 1px solid rgba(13,27,42,0.10);
+          font-size: 0.85rem;
           font-weight: 600;
+          color: #0D1B2A;
         }
-        .court-badge button {
-          border: none;
+        .court-tag button {
           background: none;
-          color: #EF4444;
-          font-weight: bold;
+          border: none;
           cursor: pointer;
+          color: #DC2626;
+          font-weight: 800;
           padding: 0;
-          font-size: 1rem;
         }
-        .progress-bar-container {
-          background: #E5E7EB;
-          border-radius: 9999px;
-          height: 8px;
-          overflow: hidden;
-          margin: 1.5rem 0;
+        .doc-drop {
+          border: 2px dashed rgba(201,168,76,0.4);
+          background: rgba(201,168,76,0.04);
+          border-radius: 16px;
+          padding: 24px;
+          text-align: center;
+          position: relative;
         }
-        .progress-bar-fill {
-          height: 100%;
-          background: linear-gradient(to right, #0D1B2A, #C9A84C);
-          transition: width 0.4s ease;
+        .doc-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          background: #F9FAFB;
+          border: 1px solid #E5E7EB;
+          border-radius: 12px;
+        }
+        .wiz-nav {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          margin-top: 2rem;
+          padding-top: 1.5rem;
+          border-top: 1px solid #E5E7EB;
         }
       `}</style>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 className="text-headline" style={{ color: 'var(--color-navy)', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'Advocate Onboarding' : 'অ্যাডভোকেট অনবোর্ডিং'}
+      <header className="wiz-header">
+        <h1 className="wiz-title" style={{ fontFamily: isBn ? 'var(--font-bangla)' : undefined }}>
+          {isBn ? 'অ্যাডভোকেট অনবোর্ডিং' : 'Advocate Onboarding'}
         </h1>
-        <p style={{ color: 'var(--color-gray-500)', fontSize: '1.0625rem', marginTop: '0.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en'
-            ? 'Complete your professional credentials to request verification by the state administrator.'
-            : 'রাজ্য প্রশাসকের দ্বারা যাচাইকরণের অনুরোধ করতে আপনার পেশাগত পরিচয়পত্র সম্পূর্ণ করুন।'}
+        <p className="wiz-sub" style={{ fontFamily: isBn ? 'var(--font-bangla)' : undefined }}>
+          {isBn
+            ? 'BCI ২০০৮ সংশোধনী অনুসারে অনুমোদিত তথ্য জমা দিন। ৪ ধাপে আপনার পেশাগত প্রোফাইল সম্পূর্ণ করুন।'
+            : 'Provide only the details permitted by the BCI 2008 amendment. Four short steps to a verifiable profile.'}
         </p>
-      </div>
+      </header>
 
       {error && (
-        <div style={{ padding: '1rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#DC2626', borderRadius: '0.75rem', marginBottom: '1.5rem', fontWeight: 500 }}>
-          {error}
+        <div
+          role="alert"
+          style={{
+            padding: '0.875rem 1rem',
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            color: '#DC2626',
+            borderRadius: '0.75rem',
+            marginBottom: '1.25rem',
+            fontWeight: 500,
+          }}
+        >
+          ⚠ {error}
         </div>
       )}
 
-      {successMsg && (
-        <div style={{ padding: '1.25rem', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669', borderRadius: '0.75rem', marginBottom: '1.5rem', fontWeight: 600, fontSize: '1.05rem', textAlign: 'center' }}>
-          {successMsg}
+      {success && (
+        <div
+          style={{
+            padding: '1rem 1.25rem',
+            background: 'rgba(16,185,129,0.08)',
+            border: '1px solid rgba(16,185,129,0.25)',
+            color: '#065F46',
+            borderRadius: '0.75rem',
+            marginBottom: '1.25rem',
+            fontWeight: 600,
+          }}
+        >
+          ✓ {success}
         </div>
       )}
 
-      <div className="wizard-card">
-        {/* Step Indicator Header */}
-        <div className="wizard-steps">
-          {[1, 2, 3, 4, 5].map(idx => (
-            <div key={idx} style={{ position: 'relative' }}>
-              <div className={`step-bubble ${step === idx ? 'active' : ''} ${step > idx ? 'completed' : ''}`}>
-                {step > idx ? '✓' : idx}
-              </div>
-              <span className="step-label" style={{ left: idx === 1 ? '16px' : idx === 5 ? '-16px' : '50%' }}>
-                {idx === 1 && (language === 'en' ? 'Profile' : 'প্রোফাইল')}
-                {idx === 2 && (language === 'en' ? 'Bar Enrol' : 'বার নথি')}
-                {idx === 3 && (language === 'en' ? 'Practice' : 'অনুশীলন')}
-                {idx === 4 && (language === 'en' ? 'Certificates' : 'সার্টিফিকেট')}
-                {idx === 5 && (language === 'en' ? 'Submit' : 'জমা দিন')}
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className="wiz-card">
+        <ol className="wiz-rail">
+          {STEP_LABELS.map((label, i) => {
+            const stepIdx = i + 1;
+            const cls = step === stepIdx ? 'active' : step > stepIdx ? 'done' : '';
+            return (
+              <li key={label.en} className={`wiz-rail-item ${cls}`}>
+                <div className="wiz-rail-step">
+                  {isBn ? `ধাপ ${stepIdx}` : `Step ${stepIdx}`}
+                </div>
+                <div className="wiz-rail-label">{isBn ? label.bn : label.en}</div>
+              </li>
+            );
+          })}
+        </ol>
 
-        {/* Step 1: Personal Info */}
+        {/* STEP 1 — Identity */}
         {step === 1 && (
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.25rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.5rem' }}>
-              1. {language === 'en' ? 'Personal & Contact Information' : 'ব্যক্তিগত এবং যোগাযোগের তথ্য'}
-            </h3>
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'Full Professional Name' : 'পূর্ণ পেশাগত নাম'} <span style={{ color: 'red' }}>*</span>
+          <section>
+            <h2 className="wiz-section-title">
+              {isBn ? '১. ব্যক্তিগত পরিচয়' : '1. Basic Identity'}
+            </h2>
+            <div className="wiz-grid">
+              <div>
+                <label className="wiz-field-label">
+                  {isBn ? 'বার কাউন্সিল সার্টিফিকেট অনুযায়ী পূর্ণ নাম' : 'Full legal name (as on Bar Council certificate)'} *
                 </label>
-                <input className="input" type="text" placeholder="Adv. John Doe" value={name} onChange={e => setName(e.target.value)} required />
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Adv. Sunita Banerjee"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
               </div>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'Contact Email' : 'যোগাযোগের ইমেল'} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <input className="input" type="email" placeholder="john.doe@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
-              </div>
-            </div>
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'Mobile Number' : 'মোবাইল নম্বর'} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <input className="input" type="tel" placeholder="+91 98765 43210" value={phone} onChange={e => setPhone(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'Chamber / Office Address' : 'চেম্বার / অফিস ঠিকানা'} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <input className="input" type="text" placeholder="Room 4, Court Building, Kolkata" value={address} onChange={e => setAddress(e.target.value)} required />
+              <div>
+                <label className="wiz-field-label">{isBn ? 'ইমেল (লক করা)' : 'Email (read-only)'}</label>
+                <input className="input" type="email" value={user?.email ?? ''} disabled readOnly />
               </div>
             </div>
-          </div>
+            <div className="wiz-grid">
+              <div>
+                <label className="wiz-field-label">
+                  {isBn ? 'মোবাইল নম্বর' : 'Mobile number'} *
+                </label>
+                <input
+                  className="input"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="+91 98xxxxxxxx"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="wiz-field-label">{isBn ? 'চেম্বার ঠিকানা (ঐচ্ছিক)' : 'Chamber address (optional)'}</label>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder={isBn ? 'যেমন: রুম ৪, কোর্ট ভবন, কলকাতা' : 'e.g. Room 4, Court Building, Kolkata'}
+                  value={address}
+                  onChange={e => setAddress(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* Step 2: Bar Details */}
+        {/* STEP 2 — BCI Details */}
         {step === 2 && (
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.25rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.5rem' }}>
-              2. {language === 'en' ? 'Bar Association Enrolment' : 'বার অ্যাসোসিয়েশন নথিভুক্তি'}
-            </h3>
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'BCI Enrolment Number' : 'বার কাউন্সিল নথিভুক্তি নম্বর'} <span style={{ color: 'red' }}>*</span>
+          <section>
+            <h2 className="wiz-section-title">
+              {isBn ? '২. বার কাউন্সিল বিবরণ (BCI ২০০৮)' : '2. Bar Council Details (BCI 2008)'}
+            </h2>
+            <div className="wiz-grid">
+              <div>
+                <label className="wiz-field-label">
+                  {isBn ? 'বার নথিভুক্তি নম্বর' : 'Bar enrolment number'} *
                 </label>
-                <input className="input" type="text" placeholder="e.g. WB/1234/2020" value={barNumber} onChange={e => setBarNumber(e.target.value)} required />
-                <span style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '0.25rem', display: 'block' }}>
-                  {language === 'en' ? 'Format must match your Certificate of Practice (CoP).' : 'ফরমেট অবশ্যই আপনার সার্টিফিকেট অফ প্র্যাকটিস (CoP) এর সাথে মিলতে হবে।'}
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="e.g. WB/1234/2020"
+                  value={barNumber}
+                  onChange={e => setBarNumber(e.target.value)}
+                />
+                <span className="wiz-field-hint">
+                  {isBn
+                    ? 'আপনার Certificate of Practice-এ যেভাবে আছে ঠিক সেভাবে।'
+                    : 'Must match exactly the number on your Certificate of Practice.'}
                 </span>
               </div>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'State Bar Council' : 'রাজ্য বার কাউন্সিল'} <span style={{ color: 'red' }}>*</span>
-                </label>
-                <select className="input" value={stateBar} onChange={e => setStateBar(e.target.value)} style={{ paddingRight: '2rem' }}>
-                  {stateBarOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
+              <div>
+                <label className="wiz-field-label">{isBn ? 'রাজ্য বার কাউন্সিল' : 'State Bar Council'} *</label>
+                <select className="input" value={stateBar} onChange={e => setStateBar(e.target.value)}>
+                  {STATE_BARS.map(s => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Step 3: Practice Details */}
-        {step === 3 && (
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.25rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.5rem' }}>
-              3. {language === 'en' ? 'Practice Specialization & Territories' : 'অনুশীলন বিশেষীকরণ এবং অঞ্চল'}
-            </h3>
-
-            {/* Languages Known */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Languages Spoken' : 'কথ্য ভাষা'} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                {languageOptions.map(opt => {
-                  const isSelected = languages.includes(opt.value);
-                  return (
-                    <div key={opt.value} className={`checkbox-card ${isSelected ? 'selected' : ''}`} onClick={() => toggleLanguageOption(opt.value)} style={{ flex: 1, justifyContent: 'center' }}>
-                      <input type="checkbox" checked={isSelected} readOnly style={{ pointerEvents: 'none' }} />
-                      <span>{language === 'en' ? opt.labelEn : opt.labelBn}</span>
-                    </div>
-                  );
-                })}
+            <div className="wiz-grid">
+              <div>
+                <label className="wiz-field-label">{isBn ? 'নথিভুক্তির বছর' : 'Year of enrolment'} *</label>
+                <input
+                  className="input"
+                  type="number"
+                  min={1950}
+                  max={CURRENT_YEAR}
+                  placeholder="2015"
+                  value={yearOfEnrolment}
+                  onChange={e => setYearOfEnrolment(e.target.value)}
+                />
               </div>
+              <div />
             </div>
-
-            {/* Practice Areas */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Specialised Practice Areas' : 'বিশেষায়িত অনুশীলনের ক্ষেত্র'} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <div className="checkbox-grid">
-                {practiceAreaOptions.map(opt => {
-                  const isSelected = practiceAreas.includes(opt.value);
-                  return (
-                    <div key={opt.value} className={`checkbox-card ${isSelected ? 'selected' : ''}`} onClick={() => togglePracticeArea(opt.value)}>
-                      <input type="checkbox" checked={isSelected} readOnly style={{ pointerEvents: 'none' }} />
-                      <span>{language === 'en' ? opt.labelEn : opt.labelBn}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Serving Districts */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Serving Districts (West Bengal)' : 'সেবা প্রদানের জেলা (পশ্চিমবঙ্গ)'} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <div className="checkbox-grid">
-                {districtOptions.map(opt => {
-                  const isSelected = districts.includes(opt.value);
-                  return (
-                    <div key={opt.value} className={`checkbox-card ${isSelected ? 'selected' : ''}`} onClick={() => toggleDistrict(opt.value)}>
-                      <input type="checkbox" checked={isSelected} readOnly style={{ pointerEvents: 'none' }} />
-                      <span>{language === 'en' ? opt.labelEn : opt.labelBn}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Courts Tag List */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label className="form-label" style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>
-                {language === 'en' ? 'Courts of Practice' : 'অনুশীলনের আদালত'} <span style={{ color: 'red' }}>*</span>
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                <input className="input" type="text" placeholder={language === 'en' ? 'e.g. Calcutta High Court' : 'যেমন: কলকাতা হাইকোর্ট'} value={newCourt} onChange={e => setNewCourt(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCourt())} />
+            <div>
+              <label className="wiz-field-label">{isBn ? 'অনুশীলনের আদালত' : 'Courts of practice'} *</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder={isBn ? 'যেমন: কলকাতা হাইকোর্ট' : 'e.g. Calcutta High Court'}
+                  value={newCourt}
+                  onChange={e => setNewCourt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCourt();
+                    }
+                  }}
+                />
                 <button type="button" className="btn btn-secondary" onClick={addCourt}>
-                  {language === 'en' ? 'Add' : 'যুক্ত করুন'}
+                  {isBn ? 'যুক্ত করুন' : 'Add'}
                 </button>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {courts.map((court, idx) => (
-                  <span key={idx} className="court-badge">
-                    {court}
-                    <button type="button" onClick={() => removeCourt(idx)} aria-label="Remove court">×</button>
-                  </span>
-                ))}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
                 {courts.length === 0 && (
-                  <span style={{ fontSize: '0.875rem', color: '#9CA3AF', fontStyle: 'italic' }}>
-                    {language === 'en' ? 'No courts added yet.' : 'এখনও কোনো আদালত যুক্ত করা হয়নি।'}
+                  <span style={{ fontSize: '0.8125rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                    {isBn ? 'এখনও কোনো আদালত যুক্ত হয়নি।' : 'No courts added yet.'}
                   </span>
                 )}
+                {courts.map((c, i) => (
+                  <span key={`${c}-${i}`} className="court-tag">
+                    {c}
+                    <button
+                      type="button"
+                      aria-label="Remove"
+                      onClick={() => setCourts(prev => prev.filter((_, idx) => idx !== i))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Step 4: Documents Upload */}
+        {/* STEP 3 — Practice Profile */}
+        {step === 3 && (
+          <section>
+            <h2 className="wiz-section-title">
+              {isBn ? '৩. অনুশীলন প্রোফাইল' : '3. Practice Profile'}
+            </h2>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label className="wiz-field-label">{isBn ? 'অনুশীলনের ক্ষেত্র' : 'Practice areas'} *</label>
+              <div className="wiz-chip-grid">
+                {PRACTICE_AREAS.map(p => {
+                  const selected = practiceAreas.includes(p.value);
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      className={`wiz-chip ${selected ? 'selected' : ''}`}
+                      onClick={() => toggleIn(practiceAreas, p.value, setPracticeAreas)}
+                    >
+                      {isBn ? p.labelBn : p.labelEn}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label className="wiz-field-label">{isBn ? 'কথ্য ভাষা' : 'Languages'} *</label>
+              <div className="wiz-chip-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                {LANGUAGES.map(l => {
+                  const selected = languages.includes(l.value);
+                  return (
+                    <button
+                      key={l.value}
+                      type="button"
+                      className={`wiz-chip ${selected ? 'selected' : ''}`}
+                      onClick={() => toggleIn(languages, l.value, setLanguages)}
+                    >
+                      {isBn ? l.labelBn : l.labelEn}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label className="wiz-field-label">
+                {isBn ? 'যে জেলাগুলিতে উপলব্ধ (পশ্চিমবঙ্গ)' : 'Districts where you are available (West Bengal)'} *
+              </label>
+              <div className="wiz-chip-grid">
+                {WB_DISTRICTS.map(d => {
+                  const selected = districts.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      className={`wiz-chip ${selected ? 'selected' : ''}`}
+                      onClick={() => toggleIn(districts, d, setDistricts)}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label className="wiz-field-label">
+                {isBn ? 'সংক্ষিপ্ত পরিচয় (সর্বোচ্চ ৩০০ অক্ষর)' : 'Brief bio (max 300 chars)'}
+              </label>
+              <textarea
+                className="input textarea"
+                rows={4}
+                maxLength={BIO_MAX}
+                placeholder={
+                  isBn
+                    ? 'BCI বিধি অনুসারে: ফি, সাফল্যের হার, বা “সেরা” জাতীয় শব্দ ব্যবহার করবেন না।'
+                    : 'BCI compliant: do not mention fees, success rate, or phrases like “best” / “top rated”.'
+                }
+                value={bio}
+                onChange={e => setBio(e.target.value)}
+                style={{ minHeight: '6rem', fontFamily: isBn ? 'var(--font-bangla)' : 'inherit' }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '0.35rem',
+                  fontSize: '0.75rem',
+                  color: bannedHits.length > 0 ? '#DC2626' : '#9CA3AF',
+                }}
+              >
+                <span>
+                  {bannedHits.length > 0
+                    ? (isBn ? 'নিষিদ্ধ শব্দ: ' : 'Disallowed terms: ') + bannedHits.join(', ')
+                    : isBn
+                      ? 'BCI Rule 36 মেনে চলতে হবে।'
+                      : 'Must comply with BCI Rule 36.'}
+                </span>
+                <span>{bio.length} / {BIO_MAX}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="wiz-field-label">{isBn ? 'পরামর্শের ধরন' : 'Consultation availability'} *</label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {([
+                  { value: 'online', en: 'Online', bn: 'অনলাইন' },
+                  { value: 'in_person', en: 'In-person', bn: 'সরাসরি' },
+                  { value: 'both', en: 'Both', bn: 'উভয়ই' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`wiz-chip ${availability === opt.value ? 'selected' : ''}`}
+                    onClick={() => setAvailability(opt.value)}
+                  >
+                    {isBn ? opt.bn : opt.en}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* STEP 4 — Documents */}
         {step === 4 && (
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.25rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.5rem' }}>
-              4. {language === 'en' ? 'Verify Credentials' : 'শংসাপত্র যাচাই করুন'}
-            </h3>
+          <section>
+            <h2 className="wiz-section-title">
+              {isBn ? '৪. শংসাপত্র আপলোড' : '4. Document Upload'}
+            </h2>
             <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              {language === 'en'
-                ? 'Upload clear scanned copies of your Bar Council Registration Certificate or Certificate of Practice (CoP). Acceptable formats: PDF, PNG, JPG (Max 5MB).'
-                : 'আপনার বার কাউন্সিল রেজিস্ট্রেশন সার্টিফিকেট বা সার্টিফিকেট অফ প্র্যাকটিস (CoP) এর স্পষ্ট স্ক্যান করা কপি আপলোড করুন। গ্রহণযোগ্য ফরম্যাট: PDF, PNG, JPG (সর্বোচ্চ ৫ মেগাবাইট)।'}
+              {isBn
+                ? 'আপনার নথিগুলি ২৪–৪৮ ঘণ্টার মধ্যে পর্যালোচনা করা হয়। যাচাইকৃত হলে আপনি অনুরোধ গ্রহণ করতে পারবেন।'
+                : 'Your documents are reviewed within 24–48 hours. You can start receiving requests once verified.'}
             </p>
 
-            <div style={{
-              border: '2px dashed rgba(201,168,76,0.3)',
-              borderRadius: '1rem',
-              padding: '2.5rem',
-              textAlign: 'center',
-              background: 'rgba(201,168,76,0.02)',
-              marginBottom: '2rem',
-              position: 'relative',
-              transition: 'border-color 0.2s',
-            }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📁</div>
-              <h4 style={{ fontWeight: 600, color: '#374151', marginBottom: '0.25rem' }}>
-                {language === 'en' ? 'Upload your certificate' : 'আপনার সার্টিফিকেট আপলোড করুন'}
-              </h4>
-              <p style={{ fontSize: '0.8rem', color: '#9CA3AF', marginBottom: '1.25rem' }}>
-                Drag and drop your file here, or click to browse
-              </p>
-              <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileUpload} disabled={uploadingDoc} style={{
-                position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer',
-              }} />
-              {uploadingDoc && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '1rem', fontWeight: 600, color: '#0D1B2A' }}>
-                  {language === 'en' ? 'Uploading document...' : 'নথি আপলোড করা হচ্ছে...'}
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div className="doc-drop">
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📜</div>
+                <div style={{ fontWeight: 700, color: '#0D1B2A' }}>
+                  {isBn ? 'Certificate of Practice (CoP) *' : 'Certificate of Practice (CoP) *'}
                 </div>
-              )}
+                <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
+                  PDF / PNG / JPG · {isBn ? 'সর্বোচ্চ ৫MB' : 'Max 5 MB'}
+                </div>
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  disabled={uploadingDoc}
+                  onChange={e => handleFileUpload(e, 'cop')}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+                />
+              </div>
+
+              <div className="doc-drop" style={{ borderColor: 'rgba(13,27,42,0.18)', background: '#FAFAFA' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🪪</div>
+                <div style={{ fontWeight: 700, color: '#0D1B2A' }}>
+                  {isBn ? 'বার কাউন্সিল আইডি কার্ড (ঐচ্ছিক)' : 'Bar Council ID card (optional, recommended)'}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
+                  PDF / PNG / JPG · {isBn ? 'সর্বোচ্চ ৫MB' : 'Max 5 MB'}
+                </div>
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  disabled={uploadingDoc}
+                  onChange={e => handleFileUpload(e, 'bar_id')}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+                />
+              </div>
             </div>
 
-            {/* List of uploaded files */}
-            <div>
+            <div style={{ marginTop: '1.5rem' }}>
               <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#374151', marginBottom: '0.75rem' }}>
-                {language === 'en' ? 'Uploaded Documents' : 'আপলোড করা নথিপত্র'} ({uploadedDocs.length})
+                {isBn ? 'আপলোড করা নথি' : 'Uploaded documents'} ({uploadedDocs.length})
               </h4>
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                {uploadedDocs.map(doc => (
-                  <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '0.75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.25rem' }}>📄</span>
-                      <div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          Certificate_{doc.id.substring(0, 8)}.{doc.file_type.split('/')[1] || 'pdf'}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
-                          Uploaded: {new Date(doc.uploaded_at).toLocaleDateString()}
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                {uploadedDocs.length === 0 ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #E5E7EB', borderRadius: '0.75rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                    {isBn ? 'এখনও কোনো নথি আপলোড হয়নি।' : 'No documents uploaded yet.'}
+                  </div>
+                ) : (
+                  uploadedDocs.map(doc => (
+                    <div key={doc.id} className="doc-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                        <span style={{ fontSize: '1.25rem' }}>📄</span>
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#374151', fontSize: '0.9rem' }}>
+                            {doc.label === 'bar_id' ? 'Bar Council ID' : 'Certificate of Practice'}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
+                            {new Date(doc.uploaded_at).toLocaleDateString(isBn ? 'bn-IN' : 'en-IN')}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <a href={doc.file_path} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: '0.8rem', color: '#C9A84C', fontWeight: 600 }}>
-                        {language === 'en' ? 'View' : 'দেখুন'}
+                      <a
+                        href={doc.file_path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost btn-sm"
+                        style={{ color: '#C9A84C', fontWeight: 600 }}
+                      >
+                        {isBn ? 'দেখুন' : 'View'}
                       </a>
-                      <button type="button" onClick={() => handleDeleteDoc(doc.id)} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px', fontSize: '0.8rem', color: '#EF4444' }}>
-                        {language === 'en' ? 'Delete' : 'মুছুন'}
-                      </button>
                     </div>
-                  </div>
-                ))}
-                {uploadedDocs.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '2rem', border: '1px dashed #E5E7EB', borderRadius: '0.75rem', color: '#9CA3AF', fontSize: '0.875rem', fontStyle: 'italic' }}>
-                    {language === 'en' ? 'No documents uploaded yet.' : 'এখনও কোনো নথি আপলোড করা হয়নি।'}
-                  </div>
+                  ))
                 )}
               </div>
             </div>
-          </div>
+
+            <div
+              style={{
+                marginTop: '1.5rem',
+                background: 'rgba(201,168,76,0.08)',
+                border: '1px solid rgba(201,168,76,0.25)',
+                padding: '1rem 1.25rem',
+                borderRadius: '0.75rem',
+                fontSize: '0.85rem',
+                color: '#A0803A',
+                lineHeight: 1.55,
+              }}
+            >
+              {isBn
+                ? 'জমা দিয়ে আপনি নিশ্চিত করছেন যে উপরের সমস্ত তথ্য সঠিক ও আপনার নিজস্ব। ভুল তথ্য প্রদান করলে আপনার প্রোফাইল অবিলম্বে স্থগিত হতে পারে।'
+                : 'By submitting, you declare that all information above is accurate and belongs to you. Misrepresentations may result in immediate suspension.'}
+            </div>
+          </section>
         )}
 
-        {/* Step 5: Review & Submit */}
-        {step === 5 && (
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.25rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.5rem' }}>
-              5. {language === 'en' ? 'Review & Submit for Verification' : 'পর্যালোচনা এবং যাচাইয়ের জন্য জমা দিন'}
-            </h3>
-
-            {/* Profile Completeness Score */}
-            <div style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '1rem', padding: '1.5rem', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, color: '#374151' }}>
-                  {language === 'en' ? 'Profile Completeness' : 'প্রোফাইলের সম্পূর্ণতা'}
-                </span>
-                <span style={{ fontWeight: 800, color: completenessScore >= 80 ? '#059669' : '#DC2626', fontSize: '1.25rem' }}>
-                  {completenessScore}%
-                </span>
-              </div>
-              <div className="progress-bar-container">
-                <div className="progress-bar-fill" style={{ width: `${completenessScore}%` }} />
-              </div>
-              <p style={{ fontSize: '0.825rem', color: '#6B7280' }}>
-                {language === 'en'
-                  ? 'A score of at least 80% is required to submit your profile for admin verification. Please fill out missing details if your score is below 80%.'
-                  : 'প্রশাসক যাচাইকরণের জন্য আপনার প্রোফাইল জমা দিতে কমপক্ষে ৮০% স্কোর প্রয়োজন। স্কোর ৮০% এর নিচে হলে অনুপস্থিত তথ্যগুলো পূরণ করুন।'}
-              </p>
-            </div>
-
-            {/* Details Summary CheckList */}
-            <div style={{ marginBottom: '2rem' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#374151', marginBottom: '0.75rem' }}>
-                {language === 'en' ? 'Profile Verification Checklist' : 'প্রোফাইল যাচাই চেকলিস্ট'}
-              </h4>
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                {completenessDetails.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.9rem', color: item.checked ? '#374151' : '#9CA3AF' }}>
-                    <span style={{ fontSize: '1.1rem', color: item.checked ? '#059669' : '#DC2626' }}>
-                      {item.checked ? '✓' : '✗'}
-                    </span>
-                    <span>{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)', padding: '1rem 1.25rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
-              <p style={{ fontSize: '0.85rem', color: '#A0803A', margin: 0, lineHeight: 1.5, fontWeight: 500 }}>
-                {language === 'en'
-                  ? 'By submitting, you declare that the bar association details, CoP certificates, and districts declared are fully accurate and belong to you. Misrepresentations may result in immediate suspension.'
-                  : 'জমা দেওয়ার মাধ্যমে, আপনি ঘোষণা করছেন যে বার অ্যাসোসিয়েশনের বিবরণ, CoP সার্টিফিকেট এবং ঘোষিত জেলাগুলি সম্পূর্ণ সঠিক এবং আপনার নিজস্ব। ভুল তথ্য দিলে অবিলম্বে স্থগিতাদেশ হতে পারে।'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Wizard Navigation Footer Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E5E7EB', marginTop: '2.5rem', paddingTop: '1.5rem' }}>
+        <div className="wiz-nav">
           {step > 1 ? (
-            <button type="button" className="btn btn-secondary" onClick={() => saveProgress(step - 1)} disabled={saving}>
-              ← {language === 'en' ? 'Back' : 'পেছনে'}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setStep(step - 1)}
+              disabled={saving || submitting}
+            >
+              ← {isBn ? 'পেছনে' : 'Back'}
             </button>
           ) : (
-            <div />
+            <span />
           )}
-
-          {step < 5 ? (
-            <button type="button" className="btn btn-primary" style={{ background: 'linear-gradient(to right, #0D1B2A, #182C40)', borderColor: '#0D1B2A' }} onClick={() => saveProgress(step + 1)} disabled={saving}>
-              {saving ? (language === 'en' ? 'Saving...' : 'সংরক্ষণ হচ্ছে...') : (language === 'en' ? 'Save & Continue' : 'সংরক্ষণ এবং এগিয়ে যান')} →
+          {step < 4 ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => saveAndAdvance(step + 1)}
+              disabled={saving}
+            >
+              {saving
+                ? isBn
+                  ? 'সংরক্ষণ হচ্ছে…'
+                  : 'Saving…'
+                : isBn
+                  ? 'সংরক্ষণ ও পরবর্তী'
+                  : 'Save & continue'}{' '}
+              →
             </button>
           ) : (
-            <button type="button" className="btn btn-primary" style={{ background: 'linear-gradient(to right, #C9A84C, #E2C475)', borderColor: '#C9A84C', color: '#0D1B2A', fontWeight: 700 }} onClick={handleSubmitVerification} disabled={saving || completenessScore < 80}>
-              {saving
-                ? (language === 'en' ? 'Submitting...' : 'জমা দেওয়া হচ্ছে...')
-                : (language === 'en' ? 'Submit for Verification' : 'যাচাইকরণের জন্য জমা দিন')} ✓
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ background: 'linear-gradient(135deg, #C9A84C 0%, #E2C475 100%)', color: '#0D1B2A' }}
+              onClick={handleSubmitForVerification}
+              disabled={submitting || uploadedDocs.length === 0}
+            >
+              {submitting
+                ? isBn
+                  ? 'জমা হচ্ছে…'
+                  : 'Submitting…'
+                : isBn
+                  ? 'যাচাইকরণের জন্য জমা দিন'
+                  : 'Submit for verification'}{' '}
+              ✓
             </button>
           )}
         </div>

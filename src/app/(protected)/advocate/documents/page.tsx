@@ -34,7 +34,6 @@ export default function AdvocateDocumentsPage() {
           if (cachedDocs) {
             setDocuments(JSON.parse(cachedDocs));
           } else {
-            // Default mock certificates
             const defaults: DocumentInfo[] = [
               {
                 id: 'mock-cop-99',
@@ -66,7 +65,6 @@ export default function AdvocateDocumentsPage() {
     }
   }, [user, language]);
 
-  // Upload handler
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -87,8 +85,7 @@ export default function AdvocateDocumentsPage() {
         const updated = [...documents, newDoc];
         setDocuments(updated);
         localStorage.setItem('mock_advocate_documents', JSON.stringify(updated));
-        
-        // Notify other components (like onboarding wizard)
+
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('advocate-profile-updated'));
         }
@@ -103,7 +100,6 @@ export default function AdvocateDocumentsPage() {
 
         if (res.success && res.data) {
           setDocuments(prev => [...prev, res.data!]);
-          // Notify other components
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('advocate-profile-updated'));
           }
@@ -117,41 +113,6 @@ export default function AdvocateDocumentsPage() {
     } finally {
       setUploading(false);
       e.target.value = '';
-    }
-  }
-
-  // Delete handler
-  async function handleDelete(id: string) {
-    setError('');
-    setSuccess('');
-    try {
-      if (USE_MOCK) {
-        await mockDelay(300);
-        const updated = documents.filter(d => d.id !== id);
-        setDocuments(updated);
-        localStorage.setItem('mock_advocate_documents', JSON.stringify(updated));
-        
-        // Notify other components
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('advocate-profile-updated'));
-        }
-      } else {
-        // Attempt API deletion
-        await apiClient(`/advocate/documents/${id}`, {
-          method: 'DELETE',
-        });
-        
-        const updated = documents.filter(d => d.id !== id);
-        setDocuments(updated);
-        
-        // Notify other components
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('advocate-profile-updated'));
-        }
-      }
-      setSuccess(language === 'en' ? 'Certificate deleted successfully.' : 'শংসাপত্র সফলভাবে মুছে ফেলা হয়েছে।');
-    } catch {
-      setError(language === 'en' ? 'Failed to delete certificate.' : 'শংসাপত্র মুছে ফেলতে ব্যর্থ হয়েছে।');
     }
   }
 
@@ -213,7 +174,7 @@ export default function AdvocateDocumentsPage() {
         <p style={{ color: 'var(--color-gray-500)', fontSize: '1.05rem', marginTop: '0.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
           {language === 'en'
             ? 'Upload and manage your BCI enrollment, CoP certificates, and professional IDs.'
-            : 'আপনার বার কাউন্সিল নথিভুক্তি শংসাপত্র, CoP শংসাপত্র এবং পেশাগত আইডিগুলি আপলোড এবং পরিচালনা করুন।'}
+            : 'আপনার বার কাউন্সিল নথুভুক্তি শংসাপত্র, CoP শংসাপত্র এবং পেশাগত আইডিগুলি আপলোড এবং পরিচালনা করুন।'}
         </p>
       </div>
 
@@ -279,7 +240,7 @@ export default function AdvocateDocumentsPage() {
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {documents.map((doc) => {
             const extension = doc.file_type.split('/')[1] || 'pdf';
-            const displayName = doc.id.startsWith('mock') 
+            const displayName = doc.id.startsWith('mock')
               ? `Bar_Council_Enrolment_Certificate.${extension}`
               : `Uploaded_Certificate_${doc.id.substring(0, 8)}.${extension}`;
             return (
@@ -306,14 +267,6 @@ export default function AdvocateDocumentsPage() {
                   >
                     👁️ {language === 'en' ? 'View' : 'দেখুন'}
                   </a>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(doc.id)}
-                    className="btn btn-ghost btn-sm"
-                    style={{ color: '#EF4444' }}
-                  >
-                    🗑️ {language === 'en' ? 'Delete' : 'মুছুন'}
-                  </button>
                 </div>
               </div>
             );
@@ -328,7 +281,7 @@ export default function AdvocateDocumentsPage() {
               borderRadius: '0.75rem',
               fontStyle: 'italic',
             }}>
-              {language === 'en' ? 'No verification certificates uploaded yet.' : 'এখনও কোনো যাচাইকরণ শংসাপত্র আপলোড করা হয়নি।'}
+              {language === 'en' ? 'No verification certificates uploaded yet.' : 'এখনো কোনো যাচাইকরণ শংসাপত্র আপলোড করা হয়নি।'}
             </div>
           )}
         </div>

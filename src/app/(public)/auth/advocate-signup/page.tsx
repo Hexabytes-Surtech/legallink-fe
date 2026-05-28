@@ -94,8 +94,9 @@ function AdvocateSignupContent() {
     });
     setLoading(false);
     if (res.success && res.data) {
-      login(res.data);
-      router.push(returnTo);
+      // For advocate signup, default to onboarding if returnTo wasn't explicitly set
+      const target = returnTo && returnTo !== '/' ? returnTo : '/advocate/onboarding';
+      login(res.data, target);
     } else {
       setError(res.error ?? t('auth.error.invalid'));
       setOtp('');

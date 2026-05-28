@@ -328,9 +328,14 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
                       </Link>
                     </>
                   ) : (
-                    <Link href="/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
-                      {t('nav.myMatters')}
-                    </Link>
+                    <>
+                      <Link href="/matters" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {t('nav.myMatters')}
+                      </Link>
+                      <Link href="/settings" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? '⚙️ Settings' : '⚙️ সেটিংস'}
+                      </Link>
+                    </>
                   )}
                   <button
                     className="user-dropdown-item"
@@ -397,9 +402,14 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
                 </Link>
               </>
             ) : (
-              <Link href="/matters" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
-                {t('nav.myMatters')}
-              </Link>
+              <>
+                <Link href="/matters" className="btn btn-secondary" onClick={() => setMenuOpen(false)}>
+                  {t('nav.myMatters')}
+                </Link>
+                <Link href="/settings" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
+                  {language === 'en' ? '⚙️ Settings' : '⚙️ সেটিংস'}
+                </Link>
+              </>
             )}
             <button className="btn btn-ghost" onClick={() => { logout(); setMenuOpen(false); }}>
               {t('nav.signout')}

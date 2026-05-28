@@ -91,6 +91,7 @@ export const MOCK_ADVOCATES: Advocate[] = [
     languages: ['en', 'bn'],
     districts: ['kolkata', 'howrah'],
     verificationStatus: 'verified',
+    bio: 'Specialising in tenancy and property disputes with 6 years of practice at Calcutta High Court. Fluent in English and Bengali. Available for urgent injunction matters.',
   },
   {
     id: 'adv-002',
@@ -105,6 +106,7 @@ export const MOCK_ADVOCATES: Advocate[] = [
     languages: ['bn', 'en', 'hi'],
     districts: ['kolkata', 'south-24-parganas'],
     verificationStatus: 'verified',
+    bio: 'Civil and family law practitioner with over 10 years at the Calcutta High Court. Handles consumer disputes, matrimonial matters, and property law.',
   },
   {
     id: 'adv-003',
@@ -119,6 +121,7 @@ export const MOCK_ADVOCATES: Advocate[] = [
     languages: ['bn'],
     districts: ['howrah', 'hooghly'],
     verificationStatus: 'verified',
+    bio: 'Criminal defence and motor vehicle accident lawyer based in Howrah. Active at Howrah District Court and Calcutta HC for over 4 years.',
   },
 ];
 

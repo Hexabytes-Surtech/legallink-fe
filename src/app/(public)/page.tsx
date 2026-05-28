@@ -1,24 +1,34 @@
 'use client';
 
+import { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Navbar } from '@/components/layout/Navbar';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiClient } from '@/lib/api/client';
+import type { BackendMatterResponse, MatterStub } from '@/types';
 
 const SERVICES = [
   {
     eyebrow: '01',
-    title: 'Describe the issue',
-    body: 'Write the facts in everyday language, in English or Bengali, without legal jargon.',
+    titleEn: 'Describe the issue',
+    titleBn: 'সমস্যাটি বর্ণনা করুন',
+    bodyEn: 'Write the facts in everyday language, in English or Bengali, without legal jargon.',
+    bodyBn: 'সহজ ভাষায় ঘটনাটি লিখুন, বাংলা বা ইংরেজিতে — কোনো আইনি পরিভাষা দরকার নেই।',
   },
   {
     eyebrow: '02',
-    title: 'Receive a plain legal map',
-    body: 'LegalLink identifies the matter type, relevant law, citations, and next practical steps.',
+    titleEn: 'Receive a plain legal map',
+    titleBn: 'সরল আইনি বিশ্লেষণ পান',
+    bodyEn: 'LegalLink identifies the matter type, relevant law, citations, and next practical steps.',
+    bodyBn: 'লিগ্যাললিংক বিষয়ের ধরন, প্রাসঙ্গিক আইন, উদ্ধৃতি ও পরবর্তী পদক্ষেপ চিহ্নিত করে।',
   },
   {
     eyebrow: '03',
-    title: 'Connect with verified advocates',
-    body: 'When a human lawyer is needed, you can request help from Bar Council-verified advocates.',
+    titleEn: 'Connect with verified advocates',
+    titleBn: 'যাচাইকৃত আইনজীবীর সাথে যোগাযোগ',
+    bodyEn: 'When a human lawyer is needed, you can request help from Bar Council-verified advocates.',
+    bodyBn: 'প্রয়োজন হলে বার কাউন্সিল যাচাইকৃত আইনজীবীর কাছে পরামর্শ চাইতে পারেন।',
   },
 ];
 
@@ -41,7 +51,8 @@ const JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
   name: 'LegalLink',
-  description: 'AI-powered legal aid platform for citizens of West Bengal. Free, anonymous, bilingual legal guidance with real statute citations and verified advocates.',
+  description:
+    'AI-powered legal aid platform for citizens of West Bengal. Free, anonymous, bilingual legal guidance with real statute citations and verified advocates.',
   url: 'https://legallink.in',
   applicationCategory: 'LegalService',
   operatingSystem: 'Any',
@@ -50,9 +61,66 @@ const JSON_LD = {
   areaServed: { '@type': 'AdministrativeArea', name: 'West Bengal, India' },
 };
 
+// Heuristic Bengali detection — even one Bengali character flips the language.
+function detectLanguage(text: string): 'en' | 'bn' {
+  return /[ঀ-৿]/.test(text) ? 'bn' : 'en';
+}
+
+function rememberMatter(matter: BackendMatterResponse) {
+  try {
+    const stubs: MatterStub[] = JSON.parse(localStorage.getItem('ll_matter_stubs') ?? '[]');
+    if (!stubs.find(s => s.id === matter.matterId)) {
+      stubs.unshift({
+        id: matter.matterId,
+        queryText: matter.query,
+        matterType: matter.aiResponse?.classification?.matterType ?? undefined,
+        status: matter.status || 'pending',
+        createdAt: matter.createdAt,
+      });
+      localStorage.setItem('ll_matter_stubs', JSON.stringify(stubs.slice(0, 50)));
+    }
+    // Track the latest anonymous matter so the user can find their way back
+    localStorage.setItem('ll_last_matter_id', matter.matterId);
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function LandingPage() {
   const { t, language } = useLanguage();
+  const router = useRouter();
   const isBangla = language === 'bn';
+
+  const [query, setQuery] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      const trimmed = query.trim();
+      if (trimmed.length < 20) {
+        setError(t('intake.error.short'));
+        return;
+      }
+      setError('');
+      setSubmitting(true);
+      const detected = detectLanguage(trimmed);
+      const res = await apiClient<BackendMatterResponse>('/matter', {
+        method: 'POST',
+        body: { query: trimmed, language: detected },
+        skipAuth: true,
+      });
+      if (res.success && res.data) {
+        rememberMatter(res.data);
+        router.push(`/matter/${res.data.matterId}`);
+      } else {
+        setSubmitting(false);
+        setError(res.error ?? t('intake.error.generic'));
+      }
+    },
+    [query, router, t]
+  );
 
   return (
     <div className="ll-landing">
@@ -66,10 +134,9 @@ export default function LandingPage() {
           background: #f6f0e6;
           color: #17211c;
           overflow-x: hidden;
+          padding-bottom: 220px;
         }
-        .ll-landing * {
-          letter-spacing: 0;
-        }
+        .ll-landing * { letter-spacing: 0; }
         .ll-shell {
           width: min(1180px, calc(100% - 32px));
           margin: 0 auto;
@@ -136,43 +203,6 @@ export default function LandingPage() {
           color: #4d5b53;
           font-size: clamp(1rem, 1.7vw, 1.18rem);
           line-height: 1.75;
-        }
-        .ll-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 14px;
-          margin-top: 34px;
-          align-items: center;
-        }
-        .ll-btn {
-          min-height: 52px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 24px;
-          border-radius: 8px;
-          font-weight: 800;
-          text-decoration: none;
-          transition: transform 180ms ease, background 180ms ease, color 180ms ease;
-        }
-        .ll-btn:hover {
-          transform: translateY(-2px);
-        }
-        .ll-btn-primary {
-          background: #17211c;
-          color: #fffaf1;
-          box-shadow: 0 18px 40px rgba(23,33,28,0.18);
-        }
-        .ll-btn-primary:hover {
-          background: #8f2638;
-        }
-        .ll-btn-secondary {
-          color: #17211c;
-          border: 1px solid rgba(23,33,28,0.28);
-          background: rgba(255,250,241,0.34);
-        }
-        .ll-btn-secondary:hover {
-          background: rgba(255,250,241,0.76);
         }
         .ll-proof {
           display: grid;
@@ -378,29 +408,8 @@ export default function LandingPage() {
           font-size: clamp(1.02rem, 1.7vw, 1.26rem);
           font-weight: 700;
         }
-        .ll-practice-item:nth-child(odd) {
-          padding-right: 20px;
-        }
-        .ll-practice-item:nth-child(even) {
-          padding-left: 20px;
-        }
-        .ll-cta {
-          padding: 88px 0;
-          background: #8f2638;
-          color: #fffaf1;
-        }
-        .ll-cta-inner {
-          display: grid;
-          grid-template-columns: 1.2fr auto;
-          gap: 32px;
-          align-items: center;
-        }
-        .ll-cta p {
-          max-width: 650px;
-          color: rgba(255,250,241,0.74);
-          margin: 18px 0 0;
-          line-height: 1.75;
-        }
+        .ll-practice-item:nth-child(odd) { padding-right: 20px; }
+        .ll-practice-item:nth-child(even) { padding-left: 20px; }
         .ll-footer {
           background: #fffaf1;
           border-top: 1px solid rgba(23,33,28,0.14);
@@ -414,76 +423,137 @@ export default function LandingPage() {
           gap: 24px;
           align-items: center;
         }
-        .ll-footer strong {
-          color: #17211c;
+        .ll-footer strong { color: #17211c; }
+
+        /* ----------- Floating chat widget ----------- */
+        .ll-chatbar {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 60;
+          padding: 14px 16px 20px;
+          background: linear-gradient(180deg, rgba(246,240,230,0) 0%, rgba(246,240,230,0.96) 38%, #f6f0e6 100%);
+          pointer-events: none;
         }
+        .ll-chatbar-inner {
+          pointer-events: auto;
+          width: min(820px, calc(100% - 16px));
+          margin: 0 auto;
+          background: #fffaf1;
+          border: 1px solid rgba(23,33,28,0.12);
+          border-radius: 22px;
+          box-shadow: 0 24px 60px -16px rgba(23,33,28,0.30),
+                      0 6px 16px -4px rgba(23,33,28,0.10);
+          padding: 14px 14px 14px 18px;
+        }
+        .ll-chatbar-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 12px;
+          background: rgba(40, 66, 53, 0.08);
+          border: 1px solid rgba(40, 66, 53, 0.18);
+          color: #284235;
+          border-radius: 999px;
+          font-size: 0.7rem;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          margin-bottom: 10px;
+        }
+        .ll-chatbar-pill::before {
+          content: "🔒";
+          font-size: 0.85rem;
+        }
+        .ll-chatbar-row {
+          display: flex;
+          align-items: flex-end;
+          gap: 10px;
+        }
+        .ll-chatbar-textarea {
+          flex: 1;
+          border: none;
+          outline: none;
+          resize: none;
+          background: transparent;
+          color: #17211c;
+          font-family: inherit;
+          font-size: 1rem;
+          line-height: 1.55;
+          min-height: 44px;
+          max-height: 140px;
+          padding: 6px 0;
+        }
+        .ll-chatbar-textarea::placeholder { color: rgba(23,33,28,0.42); }
+        .ll-chatbar-send {
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 18px;
+          background: #17211c;
+          color: #fffaf1;
+          border: none;
+          border-radius: 999px;
+          font-weight: 700;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: background 180ms ease, transform 180ms ease;
+        }
+        .ll-chatbar-send:hover:not(:disabled) {
+          background: #8f2638;
+          transform: translateY(-1px);
+        }
+        .ll-chatbar-send:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+        .ll-chatbar-error {
+          margin-top: 8px;
+          color: #8f2638;
+          font-size: 0.82rem;
+          font-weight: 600;
+        }
+        .ll-chatbar-hint {
+          margin-top: 8px;
+          color: rgba(23,33,28,0.52);
+          font-size: 0.74rem;
+          letter-spacing: 0.02em;
+        }
+        .ll-chatbar-spinner {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          border: 2px solid rgba(255,250,241,0.4);
+          border-top-color: #fffaf1;
+          animation: ll-spin 0.8s linear infinite;
+        }
+        @keyframes ll-spin { to { transform: rotate(360deg); } }
+
         @media (max-width: 980px) {
-          .ll-hero {
-            min-height: auto;
-            padding-top: 56px;
-          }
-          .ll-hero-grid,
-          .ll-band-inner,
-          .ll-practice-grid,
-          .ll-cta-inner {
-            grid-template-columns: 1fr;
-          }
-          .ll-visual {
-            min-height: 520px;
-          }
-          .ll-portrait {
-            inset: 0 0 54px 44px;
-          }
-          .ll-services-grid {
-            grid-template-columns: 1fr;
-          }
-          .ll-service {
-            min-height: 240px;
-          }
+          .ll-hero { min-height: auto; padding-top: 56px; }
+          .ll-hero-grid, .ll-band-inner, .ll-practice-grid { grid-template-columns: 1fr; }
+          .ll-visual { min-height: 520px; }
+          .ll-portrait { inset: 0 0 54px 44px; }
+          .ll-services-grid { grid-template-columns: 1fr; }
+          .ll-service { min-height: 240px; }
         }
         @media (max-width: 640px) {
-          .ll-shell {
-            width: min(100% - 24px, 1180px);
-          }
-          .ll-hero {
-            padding: 44px 0 28px;
-          }
-          .ll-hero h1 {
-            font-size: clamp(3rem, 18vw, 4.6rem);
-          }
-          .ll-actions,
-          .ll-footer-inner {
-            align-items: stretch;
-            flex-direction: column;
-          }
-          .ll-btn {
-            width: 100%;
-          }
-          .ll-proof {
-            grid-template-columns: 1fr;
-            gap: 18px;
-          }
-          .ll-visual {
-            min-height: 430px;
-          }
-          .ll-portrait {
-            inset: 0 0 72px 18px;
-          }
-          .ll-result-card {
-            width: 210px;
-            top: 34px;
-          }
-          .ll-file-stack {
-            width: 82%;
-          }
-          .ll-practice-list {
-            grid-template-columns: 1fr;
-          }
+          .ll-shell { width: min(100% - 24px, 1180px); }
+          .ll-hero { padding: 44px 0 28px; }
+          .ll-hero h1 { font-size: clamp(3rem, 18vw, 4.6rem); }
+          .ll-footer-inner { align-items: stretch; flex-direction: column; }
+          .ll-proof { grid-template-columns: 1fr; gap: 18px; }
+          .ll-visual { min-height: 430px; }
+          .ll-portrait { inset: 0 0 72px 18px; }
+          .ll-result-card { width: 210px; top: 34px; }
+          .ll-file-stack { width: 82%; }
+          .ll-practice-list { grid-template-columns: 1fr; }
           .ll-practice-item:nth-child(odd),
-          .ll-practice-item:nth-child(even) {
-            padding-left: 0;
-            padding-right: 0;
-          }
+          .ll-practice-item:nth-child(even) { padding-left: 0; padding-right: 0; }
+          .ll-chatbar-row { flex-direction: column; align-items: stretch; }
+          .ll-chatbar-send { justify-content: center; }
         }
       `}</style>
 
@@ -501,16 +571,8 @@ export default function LandingPage() {
               <p className="ll-lede" style={{ fontFamily: isBangla ? 'var(--font-bangla)' : undefined }}>
                 {t('landing.hero.subtitle')}
               </p>
-              <div className="ll-actions">
-                <Link href="/intake" className="ll-btn ll-btn-primary">
-                  {t('landing.hero.cta')}
-                </Link>
-                <a href="#how-it-works" className="ll-btn ll-btn-secondary">
-                  {t('landing.hero.cta.secondary')}
-                </a>
-              </div>
               <div className="ll-proof" aria-label="LegalLink highlights">
-                {CASE_NOTES.map((note) => (
+                {CASE_NOTES.map(note => (
                   <div className="ll-proof-item" key={note.label}>
                     <strong>{note.value}</strong>
                     <span>{note.label}</span>
@@ -543,7 +605,8 @@ export default function LandingPage() {
           <div className="ll-shell ll-band-inner">
             <h2 className="ll-section-title">Calm guidance when the law feels impossible.</h2>
             <p className="ll-section-copy">
-              Start with the facts, get a readable direction, and choose whether to speak with an advocate. The experience is built to feel composed, confidential, and human from the first click.
+              Start with the facts, get a readable direction, and choose whether to speak with an advocate.
+              The experience is built to feel composed, confidential, and human from the first click.
             </p>
           </div>
         </section>
@@ -551,11 +614,15 @@ export default function LandingPage() {
         <section className="ll-services" id="how-it-works">
           <div className="ll-shell">
             <div className="ll-services-grid">
-              {SERVICES.map((service) => (
-                <article className="ll-service" key={service.title}>
+              {SERVICES.map(service => (
+                <article className="ll-service" key={service.eyebrow}>
                   <small>{service.eyebrow}</small>
-                  <h3>{service.title}</h3>
-                  <p>{service.body}</p>
+                  <h3 style={{ fontFamily: isBangla ? 'var(--font-bangla)' : undefined }}>
+                    {isBangla ? service.titleBn : service.titleEn}
+                  </h3>
+                  <p style={{ fontFamily: isBangla ? 'var(--font-bangla)' : undefined }}>
+                    {isBangla ? service.bodyBn : service.bodyEn}
+                  </p>
                 </article>
               ))}
             </div>
@@ -569,7 +636,7 @@ export default function LandingPage() {
               <h2 className="ll-section-title">Built for everyday legal problems.</h2>
             </div>
             <div className="ll-practice-list">
-              {PRACTICE_AREAS.map((area) => (
+              {PRACTICE_AREAS.map(area => (
                 <div className="ll-practice-item" key={area}>
                   {area}
                 </div>
@@ -577,26 +644,78 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
-
-        <section className="ll-cta">
-          <div className="ll-shell ll-cta-inner">
-            <div>
-              <h2 className="ll-section-title">Start with your story.</h2>
-              <p>No appointment, no upfront payment, no need to know the name of the law. LegalLink begins with what happened.</p>
-            </div>
-            <Link href="/intake" className="ll-btn ll-btn-primary" style={{ background: '#fffaf1', color: '#17211c' }}>
-              {t('landing.hero.cta')}
-            </Link>
-          </div>
-        </section>
       </main>
 
       <footer className="ll-footer">
         <div className="ll-shell ll-footer-inner">
-          <strong>LegalLink</strong>
+          <Link href="/" style={{ color: 'inherit', textDecoration: 'none' }}>
+            <strong>LegalLink</strong>
+          </Link>
           <span>{t('landing.trust.disclaimer')}</span>
         </div>
       </footer>
+
+      {/* Floating chat input widget (master plan §5.1) */}
+      <div className="ll-chatbar" role="region" aria-label="Describe your legal problem">
+        <div className="ll-chatbar-inner">
+          <span className="ll-chatbar-pill">
+            {language === 'en'
+              ? 'Private · No sign-up needed · Responses in seconds'
+              : 'গোপনীয় · সাইন-আপ ছাড়াই · কয়েক সেকেন্ডেই উত্তর'}
+          </span>
+          <form onSubmit={handleSubmit} className="ll-chatbar-row">
+            <textarea
+              className="ll-chatbar-textarea"
+              placeholder={
+                language === 'en'
+                  ? 'Describe your legal problem in Bengali or English…'
+                  : 'বাংলা বা ইংরেজিতে আপনার আইনি সমস্যা বলুন…'
+              }
+              value={query}
+              onChange={e => {
+                setQuery(e.target.value);
+                if (error) setError('');
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              rows={1}
+              style={{
+                fontFamily:
+                  detectLanguage(query) === 'bn' || isBangla ? 'var(--font-bangla)' : undefined,
+              }}
+              disabled={submitting}
+            />
+            <button type="submit" className="ll-chatbar-send" disabled={submitting || !query.trim()}>
+              {submitting ? (
+                <>
+                  <span className="ll-chatbar-spinner" />
+                  {language === 'en' ? 'Analysing…' : 'বিশ্লেষণ হচ্ছে…'}
+                </>
+              ) : (
+                <>
+                  {language === 'en' ? 'Get free analysis' : 'বিনামূল্যে বিশ্লেষণ'}
+                  <span aria-hidden>→</span>
+                </>
+              )}
+            </button>
+          </form>
+          {error ? (
+            <div className="ll-chatbar-error" role="alert">
+              {error}
+            </div>
+          ) : (
+            <div className="ll-chatbar-hint">
+              {language === 'en'
+                ? 'Press Enter to send · Shift + Enter for a new line'
+                : 'পাঠাতে Enter চাপুন · নতুন লাইনের জন্য Shift + Enter'}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

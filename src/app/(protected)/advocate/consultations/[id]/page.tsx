@@ -114,14 +114,20 @@ export default function AdvocateConsultationDetailPage() {
             if (!found.citations) {
               found.citations = [
                 {
+                  source: 'WB Tenancy Act',
+                  citation: 'WB Tenancy Act §15, §19',
                   title: found.classification.statute || 'Relevant Statute of West Bengal',
-                  section: 'Section Section 15 & 19 — Protection of Tenant/Employee Rights',
+                  section: 'Section 15 & 19 — Protection of Tenant/Employee Rights',
+                  text: '',
                   url: 'https://indiacode.nic.in',
                   type: 'statute',
                 },
                 {
+                  source: 'Calcutta High Court',
+                  citation: '2021 Cal HC',
                   title: 'Calcutta High Court Landmark Precedent (2021)',
                   section: 'Injunction on illegal summary locks and withholding dues',
+                  text: '',
                   type: 'judgment',
                 },
               ];
