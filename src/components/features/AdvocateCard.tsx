@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface AdvocateCardProps {
   advocate: Advocate;
   onRequestConsultation: (advocate: Advocate) => void;
+  onBookTime?: (advocate: Advocate) => void;
   showViewProfile?: boolean;
 }
 
@@ -26,8 +27,8 @@ const PRACTICE_LABELS: Record<string, string> = {
   labour: 'Labour',
 };
 
-export function AdvocateCard({ advocate, onRequestConsultation, showViewProfile = false }: AdvocateCardProps) {
-  const { t } = useLanguage();
+export function AdvocateCard({ advocate, onRequestConsultation, onBookTime, showViewProfile = false }: AdvocateCardProps) {
+  const { t, language } = useLanguage();
   const { isAuthenticated } = useAuth();
 
   const initials = advocate.name
@@ -204,6 +205,26 @@ export function AdvocateCard({ advocate, onRequestConsultation, showViewProfile 
               {(advocate.districts || []).join(' · ')}
             </div>
           </div>
+
+          <div className="advocate-info-row">
+            <div className="advocate-info-label">{language === 'en' ? 'Rating' : 'রেটিং'}</div>
+            <div className="advocate-tags">
+              {advocate.rating != null ? (
+                <span className="advocate-tag" style={{ background: 'rgba(201,168,76,0.12)', color: '#A0803A', fontWeight: 600 }}>
+                  ★ {Number(advocate.rating).toFixed(1)}
+                  {advocate.rating_count != null && advocate.rating_count > 0 && (
+                    <span style={{ fontWeight: 400, marginLeft: 4, color: '#B8924A' }}>
+                      ({advocate.rating_count})
+                    </span>
+                  )}
+                </span>
+              ) : (
+                <span className="advocate-tag" style={{ color: '#9CA3AF', fontStyle: 'italic' }}>
+                  ★ {language === 'en' ? 'No ratings yet' : 'এখনো কোনো রেটিং নেই'}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="advocate-card-footer">
@@ -215,6 +236,15 @@ export function AdvocateCard({ advocate, onRequestConsultation, showViewProfile 
             >
               View Profile
             </Link>
+          )}
+          {isAuthenticated && onBookTime && (
+            <button
+              className="btn btn-secondary"
+              style={{ flex: 1, fontSize: '0.875rem' }}
+              onClick={() => onBookTime(advocate)}
+            >
+              📅 {language === 'en' ? 'Book a Time' : 'সময় বুক করুন'}
+            </button>
           )}
           <button
             className="btn btn-primary"

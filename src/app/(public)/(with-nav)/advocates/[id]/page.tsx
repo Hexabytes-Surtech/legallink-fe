@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { OTPModal } from '@/components/features/OTPModal';
+import { SlotPickerModal } from '@/components/booking/SlotPickerModal';
 import { apiClient } from '@/lib/api/client';
 import { USE_MOCK, mockDelay, MOCK_ADVOCATES } from '@/data/mock';
 import type { Advocate } from '@/types';
@@ -50,6 +51,7 @@ export default function AdvocateProfilePage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
+  const [showSlotPicker, setShowSlotPicker] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -288,6 +290,14 @@ export default function AdvocateProfilePage() {
           redirectTo="/intake"
         />
       )}
+      {showSlotPicker && advocate && (
+        <SlotPickerModal
+          advocateId={advocate.id ?? advocate.advocate_id ?? ''}
+          advocateName={advocate.name}
+          avatarUrl={advocate.avatar_url}
+          onClose={() => setShowSlotPicker(false)}
+        />
+      )}
 
       {/* Hero */}
       <div className="prof-hero">
@@ -322,6 +332,18 @@ export default function AdvocateProfilePage() {
               )}
               {stateBar && <span className="prof-chip">{stateBar} Bar</span>}
               {barNo && <span className="prof-chip" style={{ fontFamily: 'monospace', fontSize: '0.72rem' }}>{barNo}</span>}
+              {advocate.rating != null ? (
+                <span className="prof-chip" style={{ background: 'rgba(201,168,76,0.2)', borderColor: 'rgba(201,168,76,0.35)', color: '#E2C475', fontWeight: 700 }}>
+                  ★ {Number(advocate.rating).toFixed(1)}
+                  {advocate.rating_count != null && advocate.rating_count > 0 && (
+                    <span style={{ fontWeight: 400, marginLeft: 4 }}>({advocate.rating_count})</span>
+                  )}
+                </span>
+              ) : (
+                <span className="prof-chip" style={{ fontStyle: 'italic', opacity: 0.6 }}>
+                  ★ {language === 'en' ? 'No ratings yet' : 'এখনো কোনো রেটিং নেই'}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -406,9 +428,15 @@ export default function AdvocateProfilePage() {
 
       {/* Sticky CTA */}
       <div className="sticky-cta">
-        <span style={{ fontSize: '0.875rem', color: '#6B7280', display: 'none' }} className="hide-sm">
-          {name}
-        </span>
+        {isAuthenticated && (
+          <button
+            className="btn btn-secondary"
+            style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
+            onClick={() => setShowSlotPicker(true)}
+          >
+            📅 {language === 'en' ? 'Book a Time' : 'সময় বুক করুন'}
+          </button>
+        )}
         <button
           className="btn btn-primary"
           style={{ minWidth: '200px', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}

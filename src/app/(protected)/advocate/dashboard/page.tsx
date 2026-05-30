@@ -10,9 +10,11 @@ import type {
   AdvocateConsultation,
   AdvocateDashboardStats,
   ConsultationStatus,
+  MyReviewsResponse,
+  FeedbackReview,
 } from '@/types';
 
-type TabKey = 'requests' | 'active' | 'closed';
+type TabKey = 'requests' | 'active' | 'closed' | 'reviews';
 
 interface ActionState {
   consultationId: string;
@@ -58,6 +60,8 @@ export default function AdvocateDashboardPage() {
   const [pendingAction, setPendingAction] = useState<ActionState | null>(null);
   const [actionNote, setActionNote] = useState('');
   const [actionSaving, setActionSaving] = useState(false);
+  const [reviews, setReviews] = useState<MyReviewsResponse | null>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   const refreshConsultations = useCallback(async () => {
     const cons = await apiClient<AdvocateConsultation[] | { consultations: AdvocateConsultation[] }>(
@@ -168,7 +172,17 @@ export default function AdvocateDashboardPage() {
   const declinedCount = Number(stats?.consultationStats?.declined_count ?? 0);
   const completedThisMonth = closedCount; // Best available signal until "completed" is its own field.
 
-  const tabRows = buckets[tab];
+  const tabRows = tab !== 'reviews' ? buckets[tab as Exclude<TabKey, 'reviews'>] : [];
+
+  useEffect(() => {
+    if (tab !== 'reviews' || reviews !== null || reviewsLoading) return;
+    setReviewsLoading(true);
+    apiClient<MyReviewsResponse>('/advocate/reviews').then(res => {
+      if (res.success && res.data) setReviews(res.data);
+      setReviewsLoading(false);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -432,11 +446,13 @@ export default function AdvocateDashboardPage() {
           </div>
         </div>
 
-        <div className="stat">
+        <div className="stat" style={{ cursor: 'pointer' }} onClick={() => setTab('reviews')}>
           <div className="stat-label">{isBn ? 'গড় রেটিং' : 'Average Rating'}</div>
-          <div className="stat-value">—</div>
-          <div className="stat-foot" style={{ fontStyle: 'italic' }}>
-            {isBn ? 'ফিডব্যাক শীঘ্রই' : 'Coming with feedback'}
+          <div className="stat-value" style={{ color: stats?.averageRating != null ? '#C9A84C' : '#0D1B2A' }}>
+            {stats?.averageRating != null ? `★ ${stats.averageRating.toFixed(1)}` : '—'}
+          </div>
+          <div className="stat-foot">
+            {isBn ? 'রিভিউ ট্যাব দেখুন' : 'See Reviews tab'}
           </div>
         </div>
       </div>
@@ -475,13 +491,27 @@ export default function AdvocateDashboardPage() {
               {isBn ? 'বন্ধ' : 'Closed'}
               <span className="ad-tab-count">{buckets.closed.length}</span>
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'reviews'}
+              className={`ad-tab ${tab === 'reviews' ? 'active' : ''}`}
+              onClick={() => setTab('reviews')}
+            >
+              {isBn ? 'রিভিউ' : 'Reviews'}
+              {reviews && (
+                <span className="ad-tab-count">{reviews.totalCount}</span>
+              )}
+            </button>
           </div>
           <Link href="/advocate/consultations" style={{ fontSize: '0.85rem', color: '#C9A84C', fontWeight: 700, textDecoration: 'none' }}>
             {isBn ? 'বিস্তারিত পৃষ্ঠা' : 'Full inbox'} →
           </Link>
         </div>
 
-        {tabRows.length === 0 ? (
+        {tab === 'reviews' ? (
+          <ReviewsPanel reviews={reviews} loading={reviewsLoading} isBn={isBn} />
+        ) : tabRows.length === 0 ? (
           <div
             style={{
               background: 'white',
@@ -648,6 +678,106 @@ export default function AdvocateDashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Reviews panel (My Reviews tab) ──────────────────────────────────────────
+
+function StarRow({ rating }: { rating: number }) {
+  return (
+    <span style={{ color: '#C9A84C', fontSize: '1rem', letterSpacing: '-1px' }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <span key={n} style={{ opacity: n <= rating ? 1 : 0.25 }}>★</span>
+      ))}
+    </span>
+  );
+}
+
+function ReviewsPanel({ reviews, loading, isBn }: { reviews: MyReviewsResponse | null; loading: boolean; isBn: boolean }) {
+  if (loading) {
+    return (
+      <div style={{ display: 'grid', gap: '0.875rem' }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} className="skeleton" style={{ height: '96px', borderRadius: '1rem' }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!reviews) {
+    return (
+      <div style={{ background: 'white', border: '1px dashed #E5E7EB', borderRadius: '1rem', padding: '3.5rem 2rem', textAlign: 'center', color: '#9CA3AF' }}>
+        {isBn ? 'রিভিউ লোড করা যায়নি।' : 'Could not load reviews.'}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Summary bar */}
+      {reviews.totalCount > 0 && (
+        <div style={{
+          background: 'white', border: '1px solid #E5E7EB', borderRadius: '1rem',
+          padding: '1.25rem 1.5rem', marginBottom: '1rem',
+          display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: '2rem', fontWeight: 800, color: '#0D1B2A', lineHeight: 1 }}>
+              {reviews.averageRating?.toFixed(1) ?? '—'}
+            </span>
+            <StarRow rating={Math.round(reviews.averageRating ?? 0)} />
+          </div>
+          <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>
+            {isBn
+              ? `${reviews.totalCount}টি রিভিউ${reviews.hiddenCount > 0 ? ` · ${reviews.hiddenCount}টি লুকানো (BCI পর্যালোচনা)` : ''}`
+              : `${reviews.totalCount} review${reviews.totalCount !== 1 ? 's' : ''}${reviews.hiddenCount > 0 ? ` · ${reviews.hiddenCount} hidden (BCI review)` : ''}`}
+          </div>
+        </div>
+      )}
+
+      {reviews.reviews.length === 0 ? (
+        <div style={{ background: 'white', border: '1px dashed #E5E7EB', borderRadius: '1rem', padding: '3.5rem 2rem', textAlign: 'center', color: '#9CA3AF' }}>
+          {isBn ? 'এখনো কোনো রিভিউ নেই।' : 'No reviews yet.'}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {reviews.reviews.map((r: FeedbackReview & { isVisible?: boolean }) => (
+            <div
+              key={r.id}
+              style={{
+                background: 'white', border: '1px solid #E5E7EB', borderRadius: '1rem',
+                padding: '1.25rem 1.5rem',
+                opacity: r.isVisible === false ? 0.55 : 1,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                  <StarRow rating={r.rating} />
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151' }}>
+                    {r.citizenName}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {r.isVisible === false && (
+                    <span style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(239,68,68,0.08)', color: '#DC2626', borderRadius: '9999px', fontWeight: 600 }}>
+                      {isBn ? 'লুকানো' : 'Hidden'}
+                    </span>
+                  )}
+                  <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
+                    {new Date(r.createdAt).toLocaleDateString(isBn ? 'bn-IN' : 'en-IN', { dateStyle: 'medium' })}
+                  </span>
+                </div>
+              </div>
+              {r.comment && (
+                <p style={{ fontSize: '0.9rem', color: '#4B5563', lineHeight: 1.5, margin: 0 }}>
+                  &ldquo;{r.comment}&rdquo;
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -110,6 +110,7 @@ export interface BackendMatterListItem {
   consultationId?: string | null;
   consultationStatus?: 'pending' | 'accepted' | 'declined' | 'closed' | null;
   advocateName?: string | null;
+  scheduledAt?: string | null;
 }
 
 // Localstorage stub used to render /matters before/when backend list is unavailable
@@ -122,6 +123,7 @@ export interface MatterStub {
   consultationId?: string;
   consultationStatus?: 'pending' | 'accepted' | 'declined' | 'closed';
   advocateName?: string;
+  scheduledAt?: string;
 }
 
 // Frontend display type (used by mock data)
@@ -178,6 +180,8 @@ export interface Advocate {
   verification_status?: VerificationStatus;
   preferred_language?: string;
   avatar_url?: string;
+  rating?: number | null;
+  rating_count?: number;
 }
 
 export interface BackendAdvocatesResponse {
@@ -191,6 +195,7 @@ export interface BackendAdvocatesResponse {
 export interface AdvocateDashboardStats {
   verificationStatus: VerificationStatus;
   profileCompleteness: number;
+  averageRating?: number | null;
   consultationStats: {
     pending_count: string | number;
     accepted_count: string | number;
@@ -198,6 +203,26 @@ export interface AdvocateDashboardStats {
     closed_count: string | number;
     total_count: string | number;
   };
+}
+
+// GET /api/advocates/:id/feedback  +  GET /api/advocate/reviews
+export interface FeedbackReview {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  citizenName: string;
+  createdAt: string;
+  isVisible?: boolean;
+}
+
+export interface AdvocateFeedbackResponse {
+  averageRating: number | null;
+  totalCount: number;
+  reviews: FeedbackReview[];
+}
+
+export interface MyReviewsResponse extends AdvocateFeedbackResponse {
+  hiddenCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +239,9 @@ export interface BackendConsultationResponse {
   advocateId: string;
   createdAt: string;
   acceptedAt?: string;
+  appointmentId?: string;
+  scheduledAt?: string;
+  appointmentStatus?: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
 }
 
 // Alias for callers that use the camelCase variant

@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api/client';
 import { USE_MOCK, mockDelay, MOCK_MESSAGES } from '@/data/mock';
+import { FeedbackModal, isFeedbackPending } from '@/components/feedback/FeedbackModal';
 import type {
   Message,
   WsMessage,
@@ -63,6 +64,9 @@ export default function ChatPage() {
   const [brief, setBrief] = useState<MatterBrief | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackAdvocateName, setFeedbackAdvocateName] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const socketRef = useRef<any>(null);
@@ -130,6 +134,11 @@ export default function ChatPage() {
           });
         } else {
           const consRes = await apiClient<BackendConsultationResponse>(`/consultations/${consultationId}`);
+          if (consRes.data?.scheduledAt) setScheduledAt(consRes.data.scheduledAt);
+          if (consRes.data?.status === 'closed' && isFeedbackPending(consultationId)) {
+            setFeedbackAdvocateName((consRes.data as any).advocateName ?? '');
+            setShowFeedback(true);
+          }
           const matterId = consRes.data?.matterId;
           if (!matterId || cancelled) return;
           const matterRes = await apiClient<BackendMatterResponse>(`/matter/${matterId}`);
@@ -307,6 +316,14 @@ export default function ChatPage() {
 
   return (
     <div className="chat-shell">
+      {showFeedback && (
+        <FeedbackModal
+          consultationId={consultationId}
+          advocateName={feedbackAdvocateName}
+          onClose={() => setShowFeedback(false)}
+          onSubmitted={() => setShowFeedback(false)}
+        />
+      )}
       <style>{`
         .chat-layout {
           flex: 1;
@@ -633,7 +650,9 @@ export default function ChatPage() {
                     {peerLabel}
                   </h1>
                   <span className="chat-subtitle">
-                    {language === 'en' ? `Session ${consultationId.slice(0, 8).toUpperCase()}` : `সেশন ${consultationId.slice(0, 8).toUpperCase()}`}
+                    {scheduledAt
+                      ? `📅 ${new Date(scheduledAt).toLocaleString(language === 'bn' ? 'bn-IN' : 'en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                      : language === 'en' ? `Session ${consultationId.slice(0, 8).toUpperCase()}` : `সেশন ${consultationId.slice(0, 8).toUpperCase()}`}
                   </span>
                 </div>
               </div>

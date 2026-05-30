@@ -317,6 +317,9 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
                       <Link href="/advocate/documents" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
                         {language === 'en' ? 'Verification Documents' : 'যাচাইকরণ নথিপত্র'}
                       </Link>
+                      <Link href="/advocate/availability" className="user-dropdown-item" onClick={() => setDropdownOpen(false)}>
+                        {language === 'en' ? '📅 My Availability' : '📅 আমার উপলব্ধতা'}
+                      </Link>
                     </>
                   ) : user?.role === 'admin' ? (
                     <>
@@ -390,6 +393,9 @@ export function Navbar({ variant = 'dark' }: NavbarProps) {
                 </Link>
                 <Link href="/advocate/documents" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
                   {language === 'en' ? 'Verification Documents' : 'যাচাইকরণ নথিপত্র'}
+                </Link>
+                <Link href="/advocate/availability" className="btn btn-ghost" onClick={() => setMenuOpen(false)} style={{ color: 'white', display: 'block', padding: '0.5rem 0', textDecoration: 'none', textAlign: 'center' }}>
+                  {language === 'en' ? '📅 My Availability' : '📅 আমার উপলব্ধতা'}
                 </Link>
               </>
             ) : user?.role === 'admin' ? (

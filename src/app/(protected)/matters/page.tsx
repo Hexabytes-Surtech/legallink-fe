@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api/client';
+import { FeedbackModal, isFeedbackPending } from '@/components/feedback/FeedbackModal';
 import type { BackendMatterListItem, MatterStub } from '@/types';
 
 interface DisplayRow extends MatterStub {
   consultationId?: string;
   consultationStatus?: 'pending' | 'accepted' | 'declined' | 'closed';
   advocateName?: string;
+  scheduledAt?: string;
 }
 
 function mergeStubs(api: DisplayRow[], cached: DisplayRow[]): DisplayRow[] {
@@ -51,6 +53,7 @@ export default function MyMattersPage() {
   const [rows, setRows] = useState<DisplayRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [feedbackTarget, setFeedbackTarget] = useState<{ consultationId: string; advocateName: string } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -88,6 +91,7 @@ export default function MyMattersPage() {
           consultationId: m.consultationId ?? undefined,
           consultationStatus: m.consultationStatus ?? undefined,
           advocateName: m.advocateName ?? undefined,
+          scheduledAt: m.scheduledAt ?? undefined,
         }));
         const merged = mergeStubs(apiRows, cached);
         setRows(merged);
@@ -95,6 +99,13 @@ export default function MyMattersPage() {
           localStorage.setItem('ll_matter_stubs', JSON.stringify(merged.slice(0, 50)));
         } catch {
           /* ignore */
+        }
+        // Auto-trigger feedback for first closed consultation that hasn't been rated or skipped
+        const target = merged.find(
+          r => r.consultationStatus === 'closed' && r.consultationId && isFeedbackPending(r.consultationId),
+        );
+        if (target && target.consultationId) {
+          setFeedbackTarget({ consultationId: target.consultationId, advocateName: target.advocateName ?? '' });
         }
       } else {
         // Fall back to localStorage cache if the list endpoint is unavailable
@@ -134,6 +145,14 @@ export default function MyMattersPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-cream)' }}>
+      {feedbackTarget && (
+        <FeedbackModal
+          consultationId={feedbackTarget.consultationId}
+          advocateName={feedbackTarget.advocateName}
+          onClose={() => setFeedbackTarget(null)}
+          onSubmitted={() => setFeedbackTarget(null)}
+        />
+      )}
       <main
         style={{
           maxWidth: '960px',
@@ -311,6 +330,29 @@ export default function MyMattersPage() {
                           Adv. {row.advocateName}
                         </strong>
                       </span>
+                    </div>
+                  )}
+                  {row.scheduledAt && (
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.375rem',
+                        padding: '0.3rem 0.75rem',
+                        background: 'rgba(201,168,76,0.1)',
+                        border: '1px solid rgba(201,168,76,0.25)',
+                        borderRadius: '9999px',
+                        fontSize: '0.8125rem',
+                        color: '#A0803A',
+                        fontWeight: 600,
+                        width: 'fit-content',
+                      }}
+                    >
+                      📅{' '}
+                      {new Date(row.scheduledAt).toLocaleString(
+                        language === 'bn' ? 'bn-IN' : 'en-IN',
+                        { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
+                      )}
                     </div>
                   )}
 
