@@ -1,423 +1,154 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import * as React from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import { Inbox, Check, X, MessageSquare, Eye, Loader2 } from 'lucide-react';
+import { api, ApiError } from '@/lib/api/client';
+import { useQuery, useMutation } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiClient } from '@/lib/api/client';
-import { USE_MOCK, mockDelay } from '@/data/mock';
-import type { AdvocateConsultation } from '@/types';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/shared/empty-state';
+import type { AdvocateConsultation, ConsultationStatus } from '@/types';
+import type { TranslationKey } from '@/i18n/config';
 
-export default function ConsultationsListPage() {
-  const { language } = useLanguage();
+type Tr = (k: TranslationKey) => string;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [consultations, setConsultations] = useState<AdvocateConsultation[]>([]);
-  const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'all'>('pending');
+const STATUS: Record<ConsultationStatus, { label: string; variant: 'warning' | 'success' | 'destructive' | 'muted' }> = {
+  pending: { label: 'pending', variant: 'warning' },
+  accepted: { label: 'accepted', variant: 'success' },
+  declined: { label: 'declined', variant: 'destructive' },
+  closed: { label: 'closed', variant: 'muted' },
+};
 
-  // Decline Modal state
-  const [declineModalOpen, setDeclineModalOpen] = useState(false);
-  const [selectedConsId, setSelectedConsId] = useState<string | null>(null);
-  const [declineReason, setDeclineReason] = useState('');
-  const [submittingAction, setSubmittingAction] = useState(false);
+export default function AdvocateConsultationsPage() {
+  const { t } = useLanguage();
+  const q = useQuery<AdvocateConsultation[]>(() => api.get('/advocate/consultations'), []);
+  const list = q.data ?? [];
 
-  useEffect(() => {
-    async function loadConsultations() {
-      setLoading(true);
-      setError('');
-      try {
-        if (USE_MOCK) {
-          await mockDelay(600);
-          const cached = localStorage.getItem('mock_advocate_consultations');
-          if (cached) {
-            setConsultations(JSON.parse(cached));
-          } else {
-            const defaultConsultations: AdvocateConsultation[] = [
-              {
-                id: 'cons-mock-1',
-                status: 'pending',
-                requested_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-                query_text: 'My landlord locked me out of my apartment and is withholding my security deposit. I need immediate advice.',
-                query_language: 'en',
-                classification: {
-                  matterType: 'Tenancy & Housing',
-                  statute: 'West Bengal Premises Tenancy Act, 1997',
-                  userQuestion: 'Can a landlord lock out a tenant without a court order?',
-                  involvesPolice: false,
-                  location: 'Salt Lake, Kolkata',
-                },
-                citizen_user_id: 'citizen-101',
-              },
-              {
-                id: 'cons-mock-2',
-                status: 'accepted',
-                requested_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-                accepted_at: new Date(Date.now() - 2.8 * 3600 * 1000).toISOString(),
-                query_text: 'My employer did not pay salary for March and April and terminated me verbally when I asked.',
-                query_language: 'en',
-                classification: {
-                  matterType: 'Labour & Employment',
-                  statute: 'Payment of Wages Act, 1936',
-                  userQuestion: 'Is verbal termination legal and how to claim wages?',
-                  involvesPolice: false,
-                  location: 'Sector V, Kolkata',
-                },
-                citizen_user_id: 'citizen-102',
-              },
-              {
-                id: 'cons-mock-3',
-                status: 'declined',
-                requested_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-                query_text: 'A domestic violence issue within the family, looking for counseling and protection order.',
-                query_language: 'en',
-                classification: {
-                  matterType: 'Family Law',
-                  statute: 'Protection of Women from Domestic Violence Act, 2005',
-                  userQuestion: 'How to apply for protection order?',
-                  involvesPolice: true,
-                  location: 'Howrah, WB',
-                },
-                citizen_user_id: 'citizen-103',
-              },
-            ];
-            setConsultations(defaultConsultations);
-            localStorage.setItem('mock_advocate_consultations', JSON.stringify(defaultConsultations));
-          }
-        } else {
-          const res = await apiClient<AdvocateConsultation[]>('/advocate/consultations');
-          if (res.success && res.data) {
-            setConsultations(res.data);
-          } else {
-            throw new Error(res.error || 'Failed to fetch consultations.');
-          }
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error loading consultations.');
-      } finally {
-        setLoading(false);
-      }
-    }
+  const requests = list.filter((c) => c.status === 'pending');
+  const active = list.filter((c) => c.status === 'accepted');
+  const closed = list.filter((c) => c.status === 'closed' || c.status === 'declined');
 
-    loadConsultations();
-  }, []);
+  return (
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">{t('adv.consult.title')}</h1>
 
-  // Accept Consultation Handler
-  async function handleAccept(id: string) {
-    setError('');
-    setSubmittingAction(true);
-    try {
-      if (USE_MOCK) {
-        await mockDelay(400);
-        const updated = consultations.map(c => {
-          if (c.id === id) {
-            return { ...c, status: 'accepted' as const, accepted_at: new Date().toISOString() };
-          }
-          return c;
-        });
-        setConsultations(updated);
-        localStorage.setItem('mock_advocate_consultations', JSON.stringify(updated));
-      } else {
-        const res = await apiClient<{ status: string }>('/advocate/consultations/' + id, {
-          method: 'PUT',
-          body: { action: 'accept' },
-        });
-        if (res.success) {
-          setConsultations(prev =>
-            prev.map(c => (c.id === id ? { ...c, status: 'accepted' as const, accepted_at: new Date().toISOString() } : c))
-          );
-        } else {
-          throw new Error(res.error || 'Could not accept consultation request.');
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to accept consultation.');
-    } finally {
-      setSubmittingAction(false);
-    }
-  }
+      {q.loading && list.length === 0 ? (
+        <div className="mt-8 space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}</div>
+      ) : (
+        <Tabs defaultValue="requests" className="mt-8">
+          <TabsList>
+            <TabsTrigger value="requests">{t('adv.consult.tab.requests')} ({requests.length})</TabsTrigger>
+            <TabsTrigger value="active">{t('adv.consult.tab.active')} ({active.length})</TabsTrigger>
+            <TabsTrigger value="closed">{t('adv.consult.tab.closed')} ({closed.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="requests"><List items={requests} t={t} onChanged={q.refetch} /></TabsContent>
+          <TabsContent value="active"><List items={active} t={t} onChanged={q.refetch} /></TabsContent>
+          <TabsContent value="closed"><List items={closed} t={t} onChanged={q.refetch} /></TabsContent>
+        </Tabs>
+      )}
+    </div>
+  );
+}
 
-  // Open Decline Modal
-  function openDeclineModal(id: string) {
-    setSelectedConsId(id);
-    setDeclineReason('');
-    setDeclineModalOpen(true);
-  }
+function List({
+  items, t, onChanged,
+}: {
+  items: AdvocateConsultation[];
+  t: Tr;
+  onChanged: () => void;
+}) {
+  const tr = t;
+  if (items.length === 0) return <EmptyState icon={Inbox} title={tr('adv.consult.empty')} />;
+  return (
+    <div className="space-y-4">
+      {items.map((c) => <ConsultationCard key={c.id} c={c} tr={tr} onChanged={onChanged} />)}
+    </div>
+  );
+}
 
-  // Submit Decline Action
-  async function handleDeclineSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedConsId) return;
-    setError('');
-    setSubmittingAction(true);
-    setDeclineModalOpen(false);
+function ConsultationCard({
+  c, tr, onChanged,
+}: {
+  c: AdvocateConsultation;
+  tr: Tr;
+  onChanged: () => void;
+}) {
+  const st = STATUS[c.status];
+  const acceptM = useMutation(() => api.put(`/advocate/consultations/${c.id}`, { action: 'accept' }));
 
-    try {
-      if (USE_MOCK) {
-        await mockDelay(400);
-        const updated = consultations.map(c => {
-          if (c.id === selectedConsId) {
-            return { ...c, status: 'declined' as const, decline_reason: declineReason };
-          }
-          return c;
-        });
-        setConsultations(updated);
-        localStorage.setItem('mock_advocate_consultations', JSON.stringify(updated));
-      } else {
-        const res = await apiClient<{ status: string }>('/advocate/consultations/' + selectedConsId, {
-          method: 'PUT',
-          body: { action: 'decline', declineReason },
-        });
-        if (res.success) {
-          setConsultations(prev =>
-            prev.map(c => (c.id === selectedConsId ? { ...c, status: 'declined' as const, decline_reason: declineReason } : c))
-          );
-        } else {
-          throw new Error(res.error || 'Could not decline consultation request.');
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to decline consultation.');
-    } finally {
-      setSubmittingAction(false);
-      setSelectedConsId(null);
-    }
-  }
-
-  // Filter based on selected tab
-  const filteredConsultations = consultations.filter(c => {
-    if (activeTab === 'pending') return c.status === 'pending';
-    if (activeTab === 'active') return c.status === 'accepted';
-    return true;
-  });
-
-  if (loading) {
-    return (
-      <div>
-        <div className="skeleton" style={{ height: '3.5rem', width: '30%', marginBottom: '2.5rem' }} />
-        <div className="skeleton" style={{ height: '50px', borderRadius: '0.5rem', marginBottom: '1.5rem' }} />
-        <div className="skeleton" style={{ height: '180px', borderRadius: '1rem', marginBottom: '1rem' }} />
-        <div className="skeleton" style={{ height: '180px', borderRadius: '1rem' }} />
-      </div>
-    );
+  async function accept() {
+    try { await acceptM.mutate(); toast.success('Accepted'); onChanged(); }
+    catch (err) { toast.error(err instanceof ApiError ? err.first : 'Failed'); }
   }
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-      <style>{`
-        .tabs-header {
-          display: flex;
-          border-bottom: 2px solid #E5E7EB;
-          margin-bottom: 2rem;
-          gap: 1.5rem;
-        }
-        .tab-btn {
-          border: none;
-          background: none;
-          padding: 0.75rem 0.5rem;
-          font-size: 1rem;
-          font-weight: 700;
-          color: #6B7280;
-          cursor: pointer;
-          position: relative;
-          transition: all 0.2s;
-        }
-        .tab-btn:hover { color: #0D1B2A; }
-        .tab-btn.active {
-          color: #0D1B2A;
-        }
-        .tab-btn.active::after {
-          content: '';
-          position: absolute;
-          bottom: -2px;
-          left: 0;
-          right: 0;
-          height: 3px;
-          background: #C9A84C;
-        }
-        .consultation-card {
-          background: white;
-          border-radius: 1.25rem;
-          border: 1px solid #E5E7EB;
-          padding: 2rem;
-          margin-bottom: 1.5rem;
-          transition: all 0.2s;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.01);
-        }
-        .consultation-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 35px rgba(0,0,0,0.04);
-          border-color: #C9A84C;
-        }
-        .modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(13,27,42,0.6);
-          backdrop-filter: blur(5px);
-          z-index: 200;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1rem;
-        }
-        .decline-modal {
-          background: white;
-          border-radius: 1.25rem;
-          padding: 2rem;
-          max-width: 480px;
-          width: 100%;
-          box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-          animation: fadeInScale 0.2s ease;
-        }
-      `}</style>
+    <Card>
+      <CardContent className="space-y-3 py-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={st.variant} className="capitalize">{c.status}</Badge>
+          {c.classification?.matterType && <Badge variant="gold">{c.classification.matterType}</Badge>}
+          <span className="text-xs text-muted-foreground">{tr('adv.consult.from')} {c.citizen_name || 'Citizen'}</span>
+        </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h1 className="text-headline" style={{ color: 'var(--color-navy)', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-            {language === 'en' ? 'Consultation Requests' : 'পরামর্শের অনুরোধসমূহ'}
-          </h1>
-          <p style={{ color: 'var(--color-gray-500)', fontSize: '1.05rem', marginTop: '0.25rem' }}>
-            {language === 'en'
-              ? 'Review matching requests from citizens looking for advice in your area of practice.'
-              : 'আপনার অনুশীলনের ক্ষেত্রে পরামর্শের জন্য নাগরিকদের কাছ থেকে আসা অনুরোধগুলি পর্যালোচনা করুন।'}
+        <p className={`line-clamp-2 text-sm leading-relaxed text-foreground/90 ${c.query_language === 'bn' ? 'font-bn' : ''}`}>{c.query_text}</p>
+
+        {c.citizen_note && (
+          <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground/70">{tr('adv.consult.note')}: </span>{c.citizen_note}
           </p>
-        </div>
-      </div>
-
-      {error && (
-        <div style={{ padding: '1rem', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#DC2626', borderRadius: '0.75rem', marginBottom: '1.5rem', fontWeight: 600 }}>
-          {error}
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
-      <div className="tabs-header">
-        <button className={`tab-btn ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
-          {language === 'en' ? 'Pending Requests' : 'পেন্ডিং অনুরোধ'}
-          <span style={{ fontSize: '0.8rem', background: 'rgba(13,27,42,0.08)', padding: '2px 8px', borderRadius: '9999px', marginLeft: '0.5rem' }}>
-            {consultations.filter(c => c.status === 'pending').length}
-          </span>
-        </button>
-        <button className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`} onClick={() => setActiveTab('active')}>
-          {language === 'en' ? 'Active Consultations' : 'সক্রিয় কেস'}
-          <span style={{ fontSize: '0.8rem', background: 'rgba(13,27,42,0.08)', padding: '2px 8px', borderRadius: '9999px', marginLeft: '0.5rem' }}>
-            {consultations.filter(c => c.status === 'accepted').length}
-          </span>
-        </button>
-        <button className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
-          {language === 'en' ? 'All Requests' : 'সব অনুরোধ'}
-        </button>
-      </div>
-
-      {/* Consultations List */}
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {filteredConsultations.map(cons => {
-          const status = cons.status;
-          return (
-            <div key={cons.id} className="consultation-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {cons.classification?.matterType && (
-                    <span className="badge badge-navy" style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700 }}>
-                      {cons.classification.matterType}
-                    </span>
-                  )}
-                  {(() => {
-                    const loc = cons.classification?.location;
-                    const locStr = !loc ? null : typeof loc === 'string' ? loc : [(loc as { district?: string | null }).district, (loc as { state?: string | null }).state].filter(Boolean).join(', ') || null;
-                    return locStr ? (
-                      <span className="badge badge-gray" style={{ fontSize: '0.7rem' }}>
-                        📍 {locStr}
-                      </span>
-                    ) : null;
-                  })()}
-                  <span className={`badge ${status === 'pending' ? 'badge-navy' : status === 'accepted' ? 'badge-green' : 'badge-red'}`} style={{ textTransform: 'capitalize', fontSize: '0.7rem', fontWeight: 700 }}>
-                    {status === 'pending' ? 'pending approval' : status}
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.8rem', color: '#9CA3AF' }}>
-                  Requested: {new Date(cons.requested_at).toLocaleDateString(language === 'bn' ? 'bn-IN' : 'en-IN', { dateStyle: 'medium' })}
-                </span>
-              </div>
-
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-navy)', lineHeight: 1.5, marginBottom: '1rem' }}>
-                &ldquo;{cons.query_text}&rdquo;
-              </h3>
-
-              {cons.classification?.statute && (
-                <div style={{ display: 'flex', gap: '0.25rem', fontSize: '0.85rem', color: '#6B7280', marginBottom: '1.5rem' }}>
-                  <span style={{ fontWeight: 600 }}>Statute:</span>
-                  <span>{cons.classification.statute}</span>
-                </div>
-              )}
-
-              {/* Action Area */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.625rem', flexWrap: 'wrap', borderTop: '1px solid rgba(13,27,42,0.06)', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
-                <Link href={`/advocate/consultations/${cons.id}`} style={{ padding: '0.625rem 1.25rem', background: 'transparent', color: '#6B7280', border: '1.5px solid rgba(13,27,42,0.10)', borderRadius: '9999px', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none', transition: 'all 0.2s ease', display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
-                  {language === 'en' ? 'View Details' : 'বিস্তারিত দেখুন'}
-                </Link>
-
-                {status === 'pending' && (
-                  <>
-                    <button type="button" className="btn-decline" onClick={() => openDeclineModal(cons.id)} disabled={submittingAction}>
-                      {language === 'en' ? 'Decline' : 'প্রত্যাখ্যান করুন'}
-                    </button>
-                    <button type="button" className="btn-accept" onClick={() => handleAccept(cons.id)} disabled={submittingAction}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      {language === 'en' ? 'Accept Request' : 'অনুরোধ গ্রহণ করুন'}
-                    </button>
-                  </>
-                )}
-
-                {status === 'accepted' && (
-                  <Link href={`/chat/${cons.id}`} style={{ padding: '0.625rem 1.5rem', background: 'linear-gradient(135deg, #C9A84C, #E2C475)', color: '#0D1B2A', border: 'none', borderRadius: '9999px', fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none', boxShadow: '0 4px 12px -2px rgba(201,168,76,0.45)', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', transition: 'all 0.2s ease' }}>
-                    💬 {language === 'en' ? 'Enter Chat Room' : 'চ্যাট রুমে প্রবেশ করুন'}
-                  </Link>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {filteredConsultations.length === 0 && (
-          <div style={{ background: 'white', border: '1px dashed #E5E7EB', borderRadius: '1rem', padding: '5rem 2rem', textAlign: 'center', color: '#9CA3AF' }}>
-            <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📥</span>
-            <p style={{ fontWeight: 600, margin: 0, fontSize: '1.05rem' }}>
-              {activeTab === 'pending'
-                ? (language === 'en' ? 'No pending requests available.' : 'কোনো পেন্ডিং অনুরোধ নেই।')
-                : activeTab === 'active'
-                  ? (language === 'en' ? 'No active consultations.' : 'কোনো সক্রিয় পরামর্শ নেই।')
-                  : (language === 'en' ? 'No consultation requests found.' : 'কোনো অনুরোধ পাওয়া যায়নি।')}
-            </p>
-          </div>
         )}
-      </div>
 
-      {/* Decline Reason Modal */}
-      {declineModalOpen && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setDeclineModalOpen(false)}>
-          <div className="decline-modal">
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1rem' }}>
-              {language === 'en' ? 'Decline Consultation Request' : 'পরামর্শের অনুরোধ প্রত্যাখ্যান করুন'}
-            </h3>
-            <form onSubmit={handleDeclineSubmit}>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label htmlFor="decline-reason" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, color: '#374151', marginBottom: '0.5rem' }}>
-                  {language === 'en' ? 'Please provide a reason (optional)' : 'অনুগ্রহ করে একটি কারণ লিখুন (ঐচ্ছিক)'}
-                </label>
-                <textarea id="decline-reason" className="input" rows={4} placeholder={language === 'en' ? 'Schedule conflict, field outside specialization, etc.' : 'সময়ের সমস্যা, বিশেষীকরণের বাইরের ক্ষেত্র, ইত্যাদি।'} value={declineReason} onChange={e => setDeclineReason(e.target.value)} style={{ padding: '0.75rem', width: '100%', resize: 'none' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setDeclineModalOpen(false)} disabled={submittingAction}>
-                  {language === 'en' ? 'Cancel' : 'বাতিল'}
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#EF4444', borderColor: '#EF4444', color: 'white', fontWeight: 600 }} disabled={submittingAction}>
-                  {language === 'en' ? 'Decline Request' : 'প্রত্যাখ্যান করুন'}
-                </button>
-              </div>
-            </form>
-          </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button asChild variant="outline" size="sm"><Link href={`/advocate/consultations/${c.id}`}><Eye className="size-4" /> {tr('adv.consult.viewDetail')}</Link></Button>
+          {c.status === 'pending' && (
+            <>
+              <Button size="sm" onClick={accept} disabled={acceptM.loading}>
+                {acceptM.loading ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} {tr('adv.consult.accept')}
+              </Button>
+              <DeclineDialog consultationId={c.id} tr={tr} onChanged={onChanged} />
+            </>
+          )}
+          {c.status === 'accepted' && (
+            <Button asChild size="sm"><Link href={`/chat/${c.id}`}><MessageSquare className="size-4" /> {tr('adv.consult.openChat')}</Link></Button>
+          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DeclineDialog({ consultationId, tr, onChanged }: { consultationId: string; tr: Tr; onChanged: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [reason, setReason] = React.useState('');
+  const m = useMutation(() => api.put(`/advocate/consultations/${consultationId}`, { action: 'decline', declineReason: reason.trim() || undefined }));
+
+  async function submit() {
+    try { await m.mutate(); toast.success('Declined'); setOpen(false); onChanged(); }
+    catch (err) { toast.error(err instanceof ApiError ? err.first : 'Failed'); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="ghost" className="text-destructive"><X className="size-4" /> {tr('adv.consult.decline')}</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{tr('adv.consult.decline')}</DialogTitle></DialogHeader>
+        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr('adv.consult.declineReason')} className="min-h-24" maxLength={500} />
+        <Button variant="destructive" disabled={m.loading} onClick={submit}>
+          {m.loading ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />} {tr('adv.consult.decline')}
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }

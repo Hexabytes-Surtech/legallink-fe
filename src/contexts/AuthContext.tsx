@@ -13,9 +13,10 @@ interface AuthContextValue {
   role: Role | null;
   /**
    * Persist session and redirect by role.
-   * Pass `redirectTo` to override the role default (e.g. return to a matter page).
+   * Pass `redirectTo` to override the role default, or `false` to skip navigation
+   * entirely (e.g. when the caller wants to run a follow-up request first).
    */
-  login: (tokens: AuthTokens, redirectTo?: string) => void;
+  login: (tokens: AuthTokens, redirectTo?: string | false) => void;
   logout: () => Promise<void>;
   updateUser: (patch: Partial<User>) => void;
 }
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearSession]);
 
   const login = useCallback(
-    (tokens: AuthTokens, redirectTo?: string) => {
+    (tokens: AuthTokens, redirectTo?: string | false) => {
       localStorage.setItem(LS_ACCESS, tokens.accessToken);
       if (tokens.refreshToken) localStorage.setItem(LS_REFRESH, tokens.refreshToken);
       localStorage.setItem(LS_USER, JSON.stringify(tokens.user));

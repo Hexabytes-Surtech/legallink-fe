@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import { Toaster } from '@/components/ui/sonner';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.in';
 
@@ -41,20 +42,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Tiro+Bangla+Sangam&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Tiro+Bangla+Sangam&display=swap"
           rel="stylesheet"
         />
-        <meta name="theme-color" content="#0D1B2A" />
         <meta name="format-detection" content="telephone=no" />
       </head>
-      <body style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <body>
         <Providers>
           {children}
+          <Toaster />
         </Providers>
       </body>
     </html>

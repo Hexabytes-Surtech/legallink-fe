@@ -1,388 +1,183 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import * as React from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
+import { FileText, MessageSquare, Star, CalendarClock, XCircle, Plus } from 'lucide-react';
+import { api, ApiError } from '@/lib/api/client';
+import { useQuery, useMutation } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api/client';
-import { FeedbackModal, isFeedbackPending } from '@/components/feedback/FeedbackModal';
-import type { BackendMatterListItem, MatterStub } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { EmptyState } from '@/components/shared/empty-state';
+import { FeedbackDialog } from '@/components/features/feedback-dialog';
+import { BookingDialog } from '@/components/features/booking-dialog';
+import type { MatterListItem, ConsultationListItem, ConsultationStatus } from '@/types';
+import type { TranslationKey } from '@/i18n/config';
 
-interface DisplayRow extends MatterStub {
-  consultationId?: string;
-  consultationStatus?: 'pending' | 'accepted' | 'declined' | 'closed';
-  advocateName?: string;
-  scheduledAt?: string;
+const STATUS_BADGE: Record<ConsultationStatus, { key: TranslationKey; variant: 'warning' | 'success' | 'destructive' | 'muted' }> = {
+  pending: { key: 'matters.consult.pending', variant: 'warning' },
+  accepted: { key: 'matters.consult.accepted', variant: 'success' },
+  declined: { key: 'matters.consult.declined', variant: 'destructive' },
+  closed: { key: 'matters.consult.closed', variant: 'muted' },
+};
+
+function formatIst(iso: string, isBn: boolean) {
+  return new Date(iso).toLocaleString(isBn ? 'bn-IN' : 'en-IN', {
+    timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  }) + ' IST';
 }
 
-function mergeStubs(api: DisplayRow[], cached: DisplayRow[]): DisplayRow[] {
-  const map = new Map<string, DisplayRow>();
-  // Cached first, then API overwrites with fresher data
-  for (const row of cached) map.set(row.id, row);
-  for (const row of api) {
-    map.set(row.id, { ...map.get(row.id), ...row });
+export default function MattersPage() {
+  const { t, language } = useLanguage();
+  const isBn = language === 'bn';
+
+  const mattersQ = useQuery<MatterListItem[] | { matters: MatterListItem[] }>(() => api.get('/matter'), []);
+  const consultsQ = useQuery<ConsultationListItem[]>(() => api.get('/consultations'), []);
+
+  const matters = React.useMemo(() => {
+    const d = mattersQ.data;
+    return Array.isArray(d) ? d : d?.matters ?? [];
+  }, [mattersQ.data]);
+
+  const consultByMatter = React.useMemo(() => {
+    const map = new Map<string, ConsultationListItem>();
+    (consultsQ.data ?? []).forEach((c) => map.set(c.matter_id, c));
+    return map;
+  }, [consultsQ.data]);
+
+  const cancelM = useMutation((appointmentId: string) =>
+    api.put(`/appointments/${appointmentId}`, { action: 'cancel' }),
+  );
+
+  async function cancelBooking(appointmentId: string) {
+    if (!window.confirm(t('booking.cancelConfirm'))) return;
+    try {
+      await cancelM.mutate(appointmentId);
+      toast.success(t('booking.cancelled'));
+      consultsQ.refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.first : t('shared.error'));
+    }
   }
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+
+  const refresh = () => { mattersQ.refetch(); consultsQ.refetch(); };
+  const loading = mattersQ.loading && matters.length === 0;
+
+  const rows = matters.map((m) => ({ matter: m, consult: consultByMatter.get(m.matter_id) }));
+  const active = rows.filter((r) => r.consult && (r.consult.status === 'pending' || r.consult.status === 'accepted'));
+  const closed = rows.filter((r) => r.consult && (r.consult.status === 'closed' || r.consult.status === 'declined'));
+
+  return (
+    <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">{t('matters.title')}</h1>
+          <p className="mt-1 text-muted-foreground">{t('matters.subtitle')}</p>
+        </div>
+        <Button asChild><Link href="/intake"><Plus className="size-4" /> {t('matters.empty.cta')}</Link></Button>
+      </div>
+
+      {loading ? (
+        <div className="mt-8 space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="mt-10">
+          <EmptyState
+            icon={FileText}
+            title={t('matters.empty')}
+            action={<Button asChild><Link href="/intake">{t('matters.empty.cta')}</Link></Button>}
+          />
+        </div>
+      ) : (
+        <Tabs defaultValue="all" className="mt-8">
+          <TabsList>
+            <TabsTrigger value="all">{t('matters.tab.all')} ({rows.length})</TabsTrigger>
+            <TabsTrigger value="active">{t('matters.tab.active')} ({active.length})</TabsTrigger>
+            <TabsTrigger value="closed">{t('matters.tab.closed')} ({closed.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="all"><RowList rows={rows} isBn={isBn} t={t} onChanged={refresh} onCancel={cancelBooking} /></TabsContent>
+          <TabsContent value="active"><RowList rows={active} isBn={isBn} t={t} onChanged={refresh} onCancel={cancelBooking} /></TabsContent>
+          <TabsContent value="closed"><RowList rows={closed} isBn={isBn} t={t} onChanged={refresh} onCancel={cancelBooking} /></TabsContent>
+        </Tabs>
+      )}
+    </div>
   );
 }
 
-function statusBadge(row: DisplayRow, language: 'en' | 'bn') {
-  const isBn = language === 'bn';
-  if (row.consultationStatus === 'accepted') {
-    return { className: 'badge-green', label: isBn ? 'সক্রিয় পরামর্শ' : 'Active Consultation' };
+type Row = { matter: MatterListItem; consult?: ConsultationListItem };
+
+function RowList({
+  rows, isBn, t, onChanged, onCancel,
+}: {
+  rows: Row[];
+  isBn: boolean;
+  t: (k: TranslationKey) => string;
+  onChanged: () => void;
+  onCancel: (appointmentId: string) => void;
+}) {
+  const tr = t;
+  if (rows.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">{tr('matters.empty')}</p>;
   }
-  if (row.consultationStatus === 'pending') {
-    return { className: 'badge-gold', label: isBn ? 'উত্তরের অপেক্ষায়' : 'Awaiting Response' };
-  }
-  if (row.consultationStatus === 'closed') {
-    return { className: 'badge-gray', label: isBn ? 'বন্ধ' : 'Closed' };
-  }
-  if (row.consultationStatus === 'declined') {
-    return { className: 'badge-red', label: isBn ? 'প্রত্যাখ্যাত' : 'Declined' };
-  }
-  return { className: 'badge-navy', label: isBn ? 'অপেক্ষমাণ' : 'Pending' };
-}
-
-export default function MyMattersPage() {
-  const { t, language } = useLanguage();
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const router = useRouter();
-
-  const [rows, setRows] = useState<DisplayRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [feedbackTarget, setFeedbackTarget] = useState<{ consultationId: string; advocateName: string } | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/');
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError('');
-
-      let cached: DisplayRow[] = [];
-      try {
-        const raw = localStorage.getItem('ll_matter_stubs');
-        cached = raw ? (JSON.parse(raw) as DisplayRow[]) : [];
-      } catch {
-        cached = [];
-      }
-
-      const res = await apiClient<BackendMatterListItem[] | { matters: BackendMatterListItem[] }>('/matter');
-      if (cancelled) return;
-
-      if (res.success && res.data) {
-        const list = Array.isArray(res.data) ? res.data : res.data.matters ?? [];
-        const apiRows: DisplayRow[] = list.map(m => ({
-          id: m.matterId,
-          queryText: m.query,
-          matterType: m.matterType ?? undefined,
-          status: m.status || 'pending',
-          createdAt: m.createdAt,
-          consultationId: m.consultationId ?? undefined,
-          consultationStatus: m.consultationStatus ?? undefined,
-          advocateName: m.advocateName ?? undefined,
-          scheduledAt: m.scheduledAt ?? undefined,
-        }));
-        const merged = mergeStubs(apiRows, cached);
-        setRows(merged);
-        try {
-          localStorage.setItem('ll_matter_stubs', JSON.stringify(merged.slice(0, 50)));
-        } catch {
-          /* ignore */
-        }
-        // Auto-trigger feedback for first closed consultation that hasn't been rated or skipped
-        const target = merged.find(
-          r => r.consultationStatus === 'closed' && r.consultationId && isFeedbackPending(r.consultationId),
-        );
-        if (target && target.consultationId) {
-          setFeedbackTarget({ consultationId: target.consultationId, advocateName: target.advocateName ?? '' });
-        }
-      } else {
-        // Fall back to localStorage cache if the list endpoint is unavailable
-        setRows(cached.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-        if (res.statusCode && res.statusCode !== 404) {
-          setError(res.error ?? t('shared.error'));
-        }
-      }
-      setLoading(false);
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, t]);
-
-  const greeting = useMemo(() => {
-    const name = user?.name ?? user?.email?.split('@')[0] ?? '';
-    if (language === 'bn') return name ? `স্বাগতম, ${name}` : 'স্বাগতম';
-    return name ? `Welcome back, ${name}` : 'Welcome back';
-  }, [user, language]);
-
-  if (isLoading || (loading && isAuthenticated)) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-cream)' }}>
-        <div style={{ maxWidth: '960px', margin: '0 auto', padding: '3rem 1.5rem' }}>
-          <div className="skeleton" style={{ height: '2.5rem', width: '30%', marginBottom: '2rem' }} />
-          <div className="skeleton" style={{ height: '150px', borderRadius: '1.25rem', marginBottom: '1rem' }} />
-          <div className="skeleton" style={{ height: '150px', borderRadius: '1.25rem' }} />
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) return null;
-
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-cream)' }}>
-      {feedbackTarget && (
-        <FeedbackModal
-          consultationId={feedbackTarget.consultationId}
-          advocateName={feedbackTarget.advocateName}
-          onClose={() => setFeedbackTarget(null)}
-          onSubmitted={() => setFeedbackTarget(null)}
-        />
-      )}
-      <main
-        style={{
-          maxWidth: '960px',
-          margin: '0 auto',
-          padding: '3rem 1.25rem 4rem',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            marginBottom: '2rem',
-            flexWrap: 'wrap',
-            gap: '1rem',
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: 'var(--color-gold-dim, #A0803A)',
-                marginBottom: 6,
-                fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-              }}
-            >
-              {greeting}
-            </div>
-            <h1
-              className="text-headline"
-              style={{
-                color: 'var(--color-navy)',
-                fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-                margin: 0,
-              }}
-            >
-              {t('matters.title')}
-            </h1>
-            <p
-              style={{
-                color: 'var(--color-gray-500)',
-                fontSize: '1.0625rem',
-                marginTop: '0.5rem',
-                fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-              }}
-            >
-              {t('matters.subtitle')}
-            </p>
-          </div>
-          <Link href="/" className="btn btn-primary btn-sm">
-            + {language === 'en' ? 'New Matter' : 'নতুন বিষয়'}
-          </Link>
-        </div>
+    <div className="space-y-4">
+      {rows.map(({ matter, consult }) => {
+        const badge = consult ? STATUS_BADGE[consult.status] : null;
+        const scheduled = consult?.appointmentStatus === 'scheduled' && consult.appointmentId && consult.scheduledAt;
+        return (
+          <Card key={matter.matter_id}>
+            <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  {badge ? <Badge variant={badge.variant}>{tr(badge.key)}</Badge> : <Badge variant="muted">{tr('matters.consult.none')}</Badge>}
+                  {!!consult?.unread && consult.unread > 0 && <Badge variant="default">{consult.unread} {tr('matters.unreadMsgs')}</Badge>}
+                  {consult?.advocateName && <span className="text-xs text-muted-foreground">· {consult.advocateName}</span>}
+                </div>
+                <p className={`mt-2 line-clamp-2 text-sm leading-relaxed text-foreground/90 ${matter.language === 'bn' ? 'font-bn' : ''}`}>
+                  {matter.query}
+                </p>
+                {scheduled && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                    <CalendarClock className="size-3.5" /> {tr('matters.scheduledFor')}: {formatIst(consult!.scheduledAt!, isBn)}
+                  </p>
+                )}
+              </div>
 
-        {error && (
-          <div
-            style={{
-              padding: '1rem',
-              background: 'rgba(239,68,68,0.08)',
-              color: '#DC2626',
-              borderRadius: '0.75rem',
-              marginBottom: '2rem',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {rows.length === 0 ? (
-          <div className="card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📂</div>
-            <h3
-              style={{
-                fontSize: '1.25rem',
-                fontWeight: 600,
-                color: 'var(--color-navy)',
-                marginBottom: '0.5rem',
-                fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-              }}
-            >
-              {t('matters.empty')}
-            </h3>
-            <p
-              style={{
-                color: 'var(--color-gray-400)',
-                fontSize: '0.9rem',
-                marginBottom: '1.25rem',
-                fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit',
-              }}
-            >
-              {language === 'en'
-                ? "You haven't asked anything yet. Describe your problem to get started."
-                : 'এখনও কিছু জিজ্ঞাসা করেননি। শুরু করতে আপনার সমস্যা বর্ণনা করুন।'}
-            </p>
-            <Link href="/" className="btn btn-primary">
-              {t('matters.empty.cta')}
-            </Link>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '1.25rem' }}>
-            {rows.map(row => {
-              const badge = statusBadge(row, language);
-              const hasChat = row.consultationStatus === 'accepted' && row.consultationId;
-              return (
-                <article
-                  key={row.id}
-                  className="card card-hover"
-                  style={{
-                    padding: '1.5rem 1.75rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                    borderLeft: '4px solid var(--color-gold, #C9A84C)',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      gap: '1rem',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span className={`badge ${badge.className}`}>{badge.label}</span>
-                      {row.matterType && <span className="badge badge-navy">{row.matterType}</span>}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '0.8125rem',
-                        color: 'var(--color-gray-400)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {new Date(row.createdAt).toLocaleDateString(
-                        language === 'bn' ? 'bn-IN' : 'en-IN',
-                        { year: 'numeric', month: 'short', day: 'numeric' }
-                      )}
-                    </div>
-                  </div>
-
-                  <h3
-                    style={{
-                      fontSize: '1.0625rem',
-                      fontWeight: 500,
-                      color: 'var(--color-navy)',
-                      lineHeight: 1.5,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {row.queryText}
-                  </h3>
-
-                  {row.advocateName && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        color: 'var(--color-gray-600)',
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      <span aria-hidden>👤</span>
-                      <span>
-                        {language === 'en' ? 'With' : 'সহ'}{' '}
-                        <strong style={{ color: 'var(--color-navy)' }}>
-                          Adv. {row.advocateName}
-                        </strong>
-                      </span>
-                    </div>
-                  )}
-                  {row.scheduledAt && (
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        padding: '0.3rem 0.75rem',
-                        background: 'rgba(201,168,76,0.1)',
-                        border: '1px solid rgba(201,168,76,0.25)',
-                        borderRadius: '9999px',
-                        fontSize: '0.8125rem',
-                        color: '#A0803A',
-                        fontWeight: 600,
-                        width: 'fit-content',
-                      }}
-                    >
-                      📅{' '}
-                      {new Date(row.scheduledAt).toLocaleString(
-                        language === 'bn' ? 'bn-IN' : 'en-IN',
-                        { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
-                      )}
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      gap: '0.75rem',
-                      marginTop: 'auto',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {hasChat && (
-                      <Link
-                        href={`/chat/${row.consultationId}`}
-                        className="btn btn-primary btn-sm"
-                      >
-                        💬 {language === 'en' ? 'Open Chat' : 'চ্যাট খুলুন'}
-                      </Link>
-                    )}
-                    <Link href={`/matter/${row.id}`} className="btn btn-secondary btn-sm">
-                      {language === 'en' ? 'View Matter' : 'বিস্তারিত দেখুন'} →
-                    </Link>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </main>
+              <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
+                <Button asChild variant="outline" size="sm"><Link href={`/matter/${matter.matter_id}`}><FileText className="size-4" /> {tr('matters.viewMatter')}</Link></Button>
+                {consult?.status === 'accepted' && (
+                  <Button asChild size="sm"><Link href={`/chat/${consult.consultationId}`}><MessageSquare className="size-4" /> {tr('matters.openChat')}</Link></Button>
+                )}
+                {consult?.status === 'closed' && (
+                  <FeedbackDialog
+                    consultationId={consult.consultationId}
+                    onDone={onChanged}
+                    trigger={<Button size="sm" variant="secondary"><Star className="size-4" /> {tr('matters.leaveFeedback')}</Button>}
+                  />
+                )}
+                {scheduled && (
+                  <>
+                    <BookingDialog
+                      appointmentId={consult!.appointmentId!}
+                      advocateId={consult!.advocate_id}
+                      onDone={onChanged}
+                      trigger={<Button size="sm" variant="outline"><CalendarClock className="size-4" /> {tr('matters.reschedule')}</Button>}
+                    />
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => onCancel(consult!.appointmentId!)}>
+                      <XCircle className="size-4" /> {tr('matters.cancelBooking')}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

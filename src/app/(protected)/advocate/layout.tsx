@@ -1,316 +1,107 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import * as React from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import {
+  LayoutDashboard, Inbox, CalendarClock, UserCog, FileText, Star, Rocket,
+} from 'lucide-react';
+import { api } from '@/lib/api/client';
+import { useQuery } from '@/hooks/useApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiClient } from '@/lib/api/client';
-import { USE_MOCK, mockDelay } from '@/data/mock';
-import type { Advocate } from '@/types';
+import {
+  SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarFooter,
+  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset,
+} from '@/components/ui/sidebar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { VerificationBadge } from '@/components/shared/verification-badge';
+import { Spinner } from '@/components/shared/spinner';
+import type { AdvocateSelf } from '@/types';
+import type { TranslationKey } from '@/i18n/config';
+import type { LucideIcon } from 'lucide-react';
+
+const NAV: { href: string; icon: LucideIcon; key: TranslationKey }[] = [
+  { href: '/advocate/dashboard', icon: LayoutDashboard, key: 'adv.nav.dashboard' },
+  { href: '/advocate/consultations', icon: Inbox, key: 'adv.nav.consultations' },
+  { href: '/advocate/availability', icon: CalendarClock, key: 'adv.nav.availability' },
+  { href: '/advocate/reviews', icon: Star, key: 'adv.nav.reviews' },
+  { href: '/advocate/profile', icon: UserCog, key: 'adv.nav.profile' },
+  { href: '/advocate/documents', icon: FileText, key: 'adv.nav.documents' },
+  { href: '/advocate/onboarding', icon: Rocket, key: 'adv.nav.onboarding' },
+];
 
 export default function AdvocateLayout({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const { language } = useLanguage();
+  const { user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
 
-  const [advocate, setAdvocate] = useState<Advocate | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
+  // Role guard (parent layout already guarantees authentication).
+  React.useEffect(() => {
+    if (user && user.role !== 'advocate') router.replace('/matters');
+  }, [user, router]);
 
-  // Security Check: Redirect citizens back to /matters
-  useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated) {
-        router.replace('/auth/signup?returnTo=' + encodeURIComponent(pathname));
-      } else if (user?.role !== 'advocate') {
-        router.replace('/matters');
-      }
-    }
-  }, [isLoading, isAuthenticated, user, router, pathname]);
+  const meQ = useQuery<AdvocateSelf>(() => api.get('/advocate/me'), [], { enabled: user?.role === 'advocate' });
+  const me = meQ.data;
 
-  // Fetch Advocate Profile to show status in sidebar
-  useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'advocate') return;
-
-    async function fetchAdvocate() {
-      setProfileLoading(true);
-      try {
-        if (USE_MOCK) {
-          await mockDelay(300);
-          // Restore mock advocate profile from localStorage if present
-          const localProfile = localStorage.getItem('mock_advocate_profile');
-          if (localProfile) {
-            setAdvocate(JSON.parse(localProfile));
-          } else {
-            setAdvocate({
-              name: 'John Doe',
-              address: '',
-              phone: '',
-              verification_status: 'pending',
-              auth_email: user?.email,
-              courts: [],
-              languages: ['en'],
-              districts: [],
-            });
-          }
-        } else {
-          const res = await apiClient<Advocate>('/advocate/me');
-          if (res.success && res.data) {
-            setAdvocate(res.data);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load advocate sidebar profile:', err);
-      } finally {
-        setProfileLoading(false);
-      }
-    }
-
-    fetchAdvocate();
-
-    // Listen for custom events to refresh sidebar if profile updates
-    const handleProfileUpdate = () => {
-      fetchAdvocate();
-    };
-    window.addEventListener('advocate-profile-updated', handleProfileUpdate);
-    return () => {
-      window.removeEventListener('advocate-profile-updated', handleProfileUpdate);
-    };
-  }, [isAuthenticated, user]);
-
-  if (isLoading || !isAuthenticated || user?.role !== 'advocate') {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-cream)' }}>
-        <div className="skeleton" style={{ height: '3rem', width: '200px' }} />
-      </div>
-    );
+  if (user && user.role !== 'advocate') {
+    return <div className="flex flex-1 items-center justify-center"><Spinner /></div>;
   }
 
-  const menuItems = [
-    {
-      path: '/advocate/dashboard',
-      labelEn: 'Console Dashboard',
-      labelBn: 'কনসোল ড্যাশবোর্ড',
-      icon: '📊',
-    },
-    {
-      path: '/advocate/consultations',
-      labelEn: 'Consultation Requests',
-      labelBn: 'পরামর্শের অনুরোধ',
-      icon: '📥',
-    },
-    {
-      path: '/advocate/profile',
-      labelEn: 'Professional Profile',
-      labelBn: 'পেশাগত প্রোফাইল',
-      icon: '💼',
-    },
-    {
-      path: '/advocate/documents',
-      labelEn: 'Verification Vault',
-      labelBn: 'যাচাইকরণ ভল্ট',
-      icon: '🔒',
-    },
-    {
-      path: '/advocate/onboarding',
-      labelEn: 'Onboarding Wizard',
-      labelBn: 'অনবোর্ডিং উইজার্ড',
-      icon: '🎯',
-    },
-  ];
-
-  const status = advocate?.verification_status || advocate?.verificationStatus || 'pending';
+  const name = me?.name || user?.name || (user?.email?.split('@')[0] ?? 'Advocate');
+  const initials = name.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
 
   return (
-    <div style={{
-      display: 'flex',
-      minHeight: 'calc(100vh - 4rem)', // accounting for main top navbar
-      background: '#F8F6F2',
-      color: '#0D1B2A',
-      position: 'relative',
-    }}>
-      <style>{`
-        .sidebar-container {
-          width: 280px;
-          background: #0D1B2A;
-          border-right: 1px solid rgba(201,168,76,0.15);
-          display: flex;
-          flex-direction: column;
-          padding: 2rem 1.25rem;
-          color: white;
-          flex-shrink: 0;
-          box-shadow: 4px 0 25px rgba(0,0,0,0.05);
-        }
-        .sidebar-profile {
-          padding-bottom: 2rem;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
-          margin-bottom: 2rem;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-        .sidebar-avatar {
-          width: 4.5rem;
-          height: 4.5rem;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #09131F 0%, #152232 100%);
-          border: 2px solid #C9A84C;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.75rem;
-          font-weight: 700;
-          color: #C9A84C;
-          box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-          margin-bottom: 1rem;
-        }
-        .sidebar-name {
-          font-size: 1.1rem;
-          font-weight: 700;
-          color: white;
-          margin-bottom: 0.25rem;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .sidebar-email {
-          font-size: 0.8rem;
-          color: rgba(255,255,255,0.45);
-          margin-bottom: 1rem;
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          border-radius: 9999px;
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .status-pending {
-          background: rgba(201, 168, 76, 0.15);
-          color: #E2C475;
-          border: 1px solid rgba(201, 168, 76, 0.35);
-        }
-        .status-verified {
-          background: rgba(16, 185, 129, 0.15);
-          color: #34D399;
-          border: 1px solid rgba(16, 185, 129, 0.35);
-        }
-        .status-rejected {
-          background: rgba(239, 68, 68, 0.15);
-          color: #F87171;
-          border: 1px solid rgba(239, 68, 68, 0.35);
-        }
-        .sidebar-menu {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          flex: 1;
-        }
-        .menu-link {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.875rem 1rem;
-          border-radius: 0.75rem;
-          color: rgba(255,255,255,0.7);
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 0.95rem;
-          transition: all 0.2s ease;
-          border: 1px solid transparent;
-        }
-        .menu-link:hover {
-          color: white;
-          background: rgba(255,255,255,0.05);
-        }
-        .menu-link.active {
-          color: #C9A84C;
-          background: rgba(201,168,76,0.08);
-          border-color: rgba(201,168,76,0.25);
-        }
-        .menu-icon {
-          font-size: 1.1rem;
-        }
-        .content-area {
-          flex: 1;
-          padding: 2.5rem;
-          overflow-y: auto;
-        }
-        @media (max-width: 900px) {
-          .sidebar-container {
-            width: 80px;
-            padding: 1.5rem 0.5rem;
-            align-items: center;
-          }
-          .sidebar-profile {
-            border: none;
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-          }
-          .sidebar-name, .sidebar-email, .status-badge, .menu-text {
-            display: none;
-          }
-          .menu-link {
-            justify-content: center;
-            padding: 0.75rem;
-            border-radius: 50%;
-          }
-          .content-area {
-            padding: 1.5rem;
-          }
-        }
-      `}</style>
-
-      {/* Sidebar Navigation */}
-      <aside className="sidebar-container">
-        <div className="sidebar-profile">
-          <div className="sidebar-avatar">
-            {profileLoading ? '...' : (advocate?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? 'A')}
+    <SidebarProvider>
+      <Sidebar>
+        <SidebarHeader>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2.5 group-data-[state=collapsed]:justify-center">
+              <Avatar className="size-9 ring-1 ring-gold/30">
+                {me?.avatar_url && <AvatarImage src={me.avatar_url} alt="" />}
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 group-data-[state=collapsed]:hidden">
+                <p className="truncate text-sm font-semibold">{name}</p>
+                {me && <VerificationBadge status={me.verification_status} className="mt-0.5" />}
+              </div>
+            </div>
+            <SidebarTrigger className="shrink-0" />
           </div>
-          <h2 className="sidebar-name">{profileLoading ? 'Loading...' : (advocate?.name || 'New Advocate')}</h2>
-          <span className="sidebar-email">{user?.email}</span>
+        </SidebarHeader>
 
-          {!profileLoading && (
-            <span className={`status-badge status-${status}`}>
-              ● {status === 'verified'
-                ? (language === 'en' ? 'Verified' : 'যাচাইকৃত')
-                : status === 'rejected'
-                  ? (language === 'en' ? 'Rejected' : 'প্রত্যাখ্যাত')
-                  : (language === 'en' ? 'Pending' : 'অপেক্ষমান')}
-            </span>
-          )}
+        <SidebarContent>
+          <SidebarMenu>
+            {NAV.map((item) => {
+              const active = item.href === '/advocate/dashboard'
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={t(item.key)}>
+                    <Link href={item.href}><Icon /><span data-sb-hide>{t(item.key)}</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarContent>
+
+        <SidebarFooter>
+          <p className="truncate text-xs text-muted-foreground group-data-[state=collapsed]:hidden">{user?.email}</p>
+        </SidebarFooter>
+      </Sidebar>
+
+      <SidebarInset>
+        {/* Mobile open-sidebar bar */}
+        <div className="sticky top-16 z-10 flex items-center gap-2 border-b border-border bg-background/80 px-4 py-2 backdrop-blur md:hidden">
+          <SidebarTrigger />
+          <span className="text-sm font-semibold">{t('nav.dashboard')}</span>
         </div>
-
-        <nav className="sidebar-menu">
-          {menuItems.map(item => {
-            const isActive = pathname === item.path || (item.path !== '/advocate/dashboard' && pathname.startsWith(item.path));
-            return (
-              <Link key={item.path} href={item.path} className={`menu-link ${isActive ? 'active' : ''}`}>
-                <span className="menu-icon">{item.icon}</span>
-                <span className="menu-text">
-                  {language === 'en' ? item.labelEn : item.labelBn}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
-
-      {/* Main Page Content */}
-      <main className="content-area">
-        {children}
-      </main>
-    </div>
+        <div className="flex-1">{children}</div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

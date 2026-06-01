@@ -1,440 +1,147 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useLanguage } from '@/contexts/LanguageContext';
+import * as React from 'react';
+import { toast } from 'sonner';
+import { Loader2, Upload, Save } from 'lucide-react';
+import { api, ApiError } from '@/lib/api/client';
+import { useQuery } from '@/hooks/useApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api/client';
-import { USE_MOCK, mockDelay } from '@/data/mock';
-
-interface FullProfile {
-  id: string;
-  email: string;
-  name: string | null;
-  address: string | null;
-  preferred_language: string | null;
-  avatar_url: string | null;
-  role: string;
-}
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import type { UserProfile, Language } from '@/types';
 
 export default function SettingsPage() {
-  const { language, setLanguage } = useLanguage();
-  const { user, updateUser, logout } = useAuth();
-  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useLanguage();
+  const { user, updateUser } = useAuth();
+  const meQ = useQuery<UserProfile>(() => api.get('/user/me'), []);
 
-  const [profile, setProfile] = useState<FullProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [name, setName] = React.useState('');
+  const [address, setAddress] = React.useState('');
+  const [lang, setLang] = React.useState<Language>('en');
+  const [avatar, setAvatar] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
-  // Profile card state
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [prefLang, setPrefLang] = useState<'en' | 'bn'>('en');
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileSuccess, setProfileSuccess] = useState('');
-  const [profileError, setProfileError] = useState('');
-
-  // Avatar card state
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [avatarError, setAvatarError] = useState('');
-  const [avatarSuccess, setAvatarSuccess] = useState('');
-
-  useEffect(() => {
-    async function loadProfile() {
-      setLoadingProfile(true);
-      try {
-        if (USE_MOCK) {
-          await mockDelay(400);
-          const stored = localStorage.getItem('mock_user_profile');
-          const base: FullProfile = stored
-            ? JSON.parse(stored)
-            : {
-                id: user?.userId ?? 'mock-user',
-                email: user?.email ?? 'citizen@example.com',
-                name: user?.name ?? '',
-                address: '',
-                preferred_language: 'en',
-                avatar_url: user?.avatar_url ?? null,
-                role: user?.role ?? 'citizen',
-              };
-          setProfile(base);
-          setName(base.name ?? '');
-          setAddress(base.address ?? '');
-          setPrefLang((base.preferred_language as 'en' | 'bn') ?? 'en');
-        } else {
-          const res = await apiClient<FullProfile>('/user/me');
-          if (res.success && res.data) {
-            setProfile(res.data);
-            setName(res.data.name ?? '');
-            setAddress(res.data.address ?? '');
-            setPrefLang((res.data.preferred_language as 'en' | 'bn') ?? 'en');
-          } else {
-            throw new Error(res.error ?? 'Failed to load profile');
-          }
-        }
-      } catch {
-        // non-fatal — user can still see/edit with empty fields
-      } finally {
-        setLoadingProfile(false);
-      }
+  React.useEffect(() => {
+    if (meQ.data) {
+      setName(meQ.data.name ?? '');
+      setAddress(meQ.data.address ?? '');
+      setLang(meQ.data.preferred_language ?? 'en');
+      setAvatar(meQ.data.avatar_url ?? null);
     }
+  }, [meQ.data]);
 
-    if (user) loadProfile();
-  }, [user]);
-
-  async function handleSaveProfile(e: React.FormEvent) {
-    e.preventDefault();
-    setProfileError('');
-    setProfileSuccess('');
-    setSavingProfile(true);
-
+  async function save() {
+    setSaving(true);
     try {
-      if (USE_MOCK) {
-        await mockDelay(600);
-        const updated = { ...profile!, name: name.trim(), address: address.trim(), preferred_language: prefLang };
-        setProfile(updated);
-        localStorage.setItem('mock_user_profile', JSON.stringify(updated));
-        updateUser({ name: name.trim() });
-      } else {
-        const res = await apiClient('/user/profile', {
-          method: 'PUT',
-          body: { name: name.trim(), address: address.trim(), preferred_language: prefLang },
-        });
-        if (!res.success) throw new Error(res.error ?? 'Failed to save profile');
-        updateUser({ name: name.trim() });
-      }
-
-      if (prefLang !== language) setLanguage(prefLang);
-      setProfileSuccess(language === 'en' ? 'Profile saved successfully!' : 'প্রোফাইল সফলভাবে সংরক্ষিত হয়েছে!');
+      const updated = await api.put<UserProfile>('/user/profile', {
+        name: name.trim() || undefined,
+        address: address.trim() || undefined,
+        preferred_language: lang,
+      });
+      updateUser({ name: updated.name ?? undefined });
+      toast.success(t('settings.saved'));
     } catch (err) {
-      setProfileError(err instanceof Error ? err.message : (language === 'en' ? 'Failed to save profile.' : 'প্রোফাইল সংরক্ষণ ব্যর্থ হয়েছে।'));
+      toast.error(err instanceof ApiError ? err.first : t('shared.error'));
     } finally {
-      setSavingProfile(false);
+      setSaving(false);
     }
   }
 
-  async function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setAvatarError('');
-    setAvatarSuccess('');
-
-    if (file.size > 2 * 1024 * 1024) {
-      setAvatarError(language === 'en' ? 'Image too large (max 2MB)' : 'ছবি খুব বড় (সর্বোচ্চ ২MB)');
-      e.target.value = '';
-      return;
-    }
-
-    setUploadingAvatar(true);
+    setUploading(true);
     try {
-      if (USE_MOCK) {
-        await mockDelay(700);
-        const objectUrl = URL.createObjectURL(file);
-        updateUser({ avatar_url: objectUrl });
-        setProfile(prev => prev ? { ...prev, avatar_url: objectUrl } : prev);
-        setAvatarSuccess(language === 'en' ? 'Photo updated!' : 'ছবি আপডেট হয়েছে!');
-      } else {
-        const fd = new FormData();
-        fd.append('avatar', file);
-        const res = await apiClient<{ avatar_url: string }>('/user/avatar', { method: 'POST', formData: fd });
-        if (res.success && res.data?.avatar_url) {
-          updateUser({ avatar_url: res.data.avatar_url });
-          setProfile(prev => prev ? { ...prev, avatar_url: res.data!.avatar_url } : prev);
-          setAvatarSuccess(language === 'en' ? 'Photo updated!' : 'ছবি আপডেট হয়েছে!');
-        } else {
-          throw new Error(res.error ?? 'Upload failed');
-        }
-      }
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await api.upload<{ avatar_url: string }>('/user/avatar', fd);
+      setAvatar(res.avatar_url);
+      updateUser({ avatar_url: res.avatar_url });
+      toast.success(t('settings.uploaded'));
     } catch (err) {
-      setAvatarError(err instanceof Error ? err.message : (language === 'en' ? 'Upload failed.' : 'আপলোড ব্যর্থ হয়েছে।'));
+      toast.error(err instanceof ApiError ? err.first : t('shared.error'));
     } finally {
-      setUploadingAvatar(false);
-      e.target.value = '';
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   }
 
-  const initials = (user?.name ?? user?.email ?? 'U')[0].toUpperCase();
-  const avatarUrl = profile?.avatar_url ?? user?.avatar_url;
-
-  if (loadingProfile) {
-    return (
-      <div style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1rem' }}>
-        <div className="skeleton" style={{ height: '3rem', width: '35%', marginBottom: '2.5rem' }} />
-        <div className="skeleton" style={{ height: '280px', borderRadius: '1.25rem', marginBottom: '1.5rem' }} />
-        <div className="skeleton" style={{ height: '180px', borderRadius: '1.25rem' }} />
-      </div>
-    );
-  }
+  const initials = (name || user?.email || 'U').trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', padding: '2rem 1rem 4rem' }}>
-      <style>{`
-        .settings-card {
-          background: white;
-          border: 1px solid #E5E7EB;
-          border-radius: 1.25rem;
-          padding: 2rem;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-          margin-bottom: 1.5rem;
-        }
-        .settings-label {
-          display: block;
-          font-size: 0.8125rem;
-          font-weight: 600;
-          color: #6B7280;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          margin-bottom: 0.4rem;
-        }
-        .settings-input {
-          width: 100%;
-          padding: 0.75rem 1rem;
-          border: 1.5px solid #E5E7EB;
-          border-radius: 0.75rem;
-          font-size: 0.9375rem;
-          color: var(--color-navy);
-          background: #FAFAF9;
-          outline: none;
-          transition: border-color 0.15s;
-          box-sizing: border-box;
-        }
-        .settings-input:focus { border-color: #C9A84C; background: white; }
-        .settings-input:disabled { opacity: 0.6; cursor: not-allowed; }
-        .settings-input-readonly {
-          background: #F3F4F6;
-          color: #9CA3AF;
-          cursor: default;
-        }
-        .lang-radio-group {
-          display: flex;
-          gap: 0.75rem;
-        }
-        .lang-radio-label {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          padding: 0.75rem 1rem;
-          border: 1.5px solid #E5E7EB;
-          border-radius: 0.75rem;
-          cursor: pointer;
-          font-size: 0.9375rem;
-          font-weight: 500;
-          color: #6B7280;
-          transition: all 0.15s;
-          background: #FAFAF9;
-        }
-        .lang-radio-label.selected {
-          border-color: #C9A84C;
-          background: rgba(201,168,76,0.06);
-          color: var(--color-navy);
-          font-weight: 600;
-        }
-        .lang-radio-label input { display: none; }
-        .avatar-preview {
-          width: 5rem;
-          height: 5rem;
-          border-radius: 9999px;
-          background: linear-gradient(135deg, #C9A84C, #E2C475);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #0D1B2A;
-          border: 3px solid rgba(201,168,76,0.35);
-          overflow: hidden;
-          flex-shrink: 0;
-        }
-        .toast-success {
-          padding: 0.875rem 1rem;
-          background: rgba(16,185,129,0.08);
-          border: 1px solid rgba(16,185,129,0.2);
-          color: #059669;
-          border-radius: 0.75rem;
-          font-weight: 600;
-          font-size: 0.9rem;
-          margin-bottom: 1.25rem;
-        }
-        .toast-error {
-          padding: 0.875rem 1rem;
-          background: rgba(239,68,68,0.08);
-          border: 1px solid rgba(239,68,68,0.2);
-          color: #DC2626;
-          border-radius: 0.75rem;
-          font-weight: 600;
-          font-size: 0.9rem;
-          margin-bottom: 1.25rem;
-        }
-      `}</style>
+    <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
+      <h1 className="font-display text-3xl font-semibold tracking-tight">{t('settings.title')}</h1>
+      <p className="mt-1 text-muted-foreground">{t('settings.subtitle')}</p>
 
-      {/* Page header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 className="text-headline" style={{ color: 'var(--color-navy)', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'Account Settings' : 'অ্যাকাউন্ট সেটিংস'}
-        </h1>
-        <p style={{ color: 'var(--color-gray-500)', fontSize: '1.05rem', marginTop: '0.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'Manage your profile and preferences.' : 'আপনার প্রোফাইল এবং পছন্দগুলি পরিচালনা করুন।'}
-        </p>
-      </div>
-
-      {/* ── Profile Card ── */}
-      <div className="settings-card">
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.5rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'Profile' : 'প্রোফাইল'}
-        </h3>
-
-        {profileSuccess && <div className="toast-success">{profileSuccess}</div>}
-        {profileError && <div className="toast-error">{profileError}</div>}
-
-        <form onSubmit={handleSaveProfile}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-            {/* Email — read-only */}
-            <div>
-              <label className="settings-label" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-                {language === 'en' ? 'Email' : 'ইমেইল'}
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <input
-                  className="settings-input settings-input-readonly"
-                  value={profile?.email ?? user?.email ?? ''}
-                  readOnly
-                />
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.35rem 0.75rem', background: 'rgba(16,185,129,0.1)', color: '#059669', borderRadius: '9999px', whiteSpace: 'nowrap' }}>
-                  {language === 'en' ? 'Verified' : 'যাচাইকৃত'}
-                </span>
+      {meQ.loading && !meQ.data ? (
+        <Skeleton className="mt-8 h-96 w-full rounded-xl" />
+      ) : (
+        <Card className="mt-8">
+          <CardHeader><CardTitle>{t('settings.profile')}</CardTitle></CardHeader>
+          <CardContent className="space-y-6">
+            {/* Avatar */}
+            <div className="flex items-center gap-4">
+              <Avatar className="size-16 ring-1 ring-border">
+                {avatar && <AvatarImage src={avatar} alt="" />}
+                <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+              </Avatar>
+              <div>
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onAvatarPick} />
+                <Button variant="outline" size="sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                  {uploading ? <><Loader2 className="size-4 animate-spin" />…</> : <><Upload className="size-4" /> {t('settings.avatar')}</>}
+                </Button>
+                <p className="mt-1.5 text-xs text-muted-foreground">{t('settings.avatarHint')}</p>
               </div>
             </div>
 
-            {/* Display name */}
-            <div>
-              <label htmlFor="settings-name" className="settings-label" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-                {language === 'en' ? 'Display Name' : 'প্রদর্শনের নাম'}
-              </label>
-              <input
-                id="settings-name"
-                className="settings-input"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder={language === 'en' ? 'Your full name' : 'আপনার পুরো নাম'}
-                maxLength={100}
-                disabled={savingProfile}
-                style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-              />
-            </div>
-
-            {/* Address */}
-            <div>
-              <label htmlFor="settings-address" className="settings-label" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-                {language === 'en' ? 'Address' : 'ঠিকানা'}
-              </label>
-              <input
-                id="settings-address"
-                className="settings-input"
-                value={address}
-                onChange={e => setAddress(e.target.value)}
-                placeholder={language === 'en' ? 'e.g. 12 Park Street, Kolkata 700016' : 'যেমন: ১২ পার্ক স্ট্রিট, কলকাতা ৭০০০১৬'}
-                maxLength={200}
-                disabled={savingProfile}
-                style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-              />
-            </div>
-
-            {/* Preferred language */}
-            <div>
-              <label className="settings-label" style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-                {language === 'en' ? 'Preferred Language' : 'পছন্দের ভাষা'}
-              </label>
-              <div className="lang-radio-group">
-                <label className={`lang-radio-label${prefLang === 'en' ? ' selected' : ''}`}>
-                  <input type="radio" name="pref-lang" value="en" checked={prefLang === 'en'} onChange={() => setPrefLang('en')} disabled={savingProfile} />
-                  🇬🇧 English
-                </label>
-                <label className={`lang-radio-label${prefLang === 'bn' ? ' selected' : ''}`} style={{ fontFamily: 'var(--font-bangla)' }}>
-                  <input type="radio" name="pref-lang" value="bn" checked={prefLang === 'bn'} onChange={() => setPrefLang('bn')} disabled={savingProfile} />
-                  🇧🇩 বাংলা
-                </label>
+            {/* Read-only account */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>{t('settings.email')}</Label>
+                <Input value={meQ.data?.email ?? user?.email ?? ''} disabled />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('settings.role')}</Label>
+                <div className="flex h-11 items-center"><Badge variant="gold" className="capitalize">{meQ.data?.role ?? user?.role}</Badge></div>
               </div>
             </div>
 
-          </div>
+            {/* Editable */}
+            <div className="space-y-1.5">
+              <Label htmlFor="s-name">{t('settings.name')}</Label>
+              <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="s-addr">{t('settings.address')}</Label>
+              <Textarea id="s-addr" value={address} onChange={(e) => setAddress(e.target.value)} className="min-h-20" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t('settings.language')}</Label>
+              <Select value={lang} onValueChange={(v) => setLang(v as Language)}>
+                <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="bn">বাংলা</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={savingProfile}
-            style={{ marginTop: '1.75rem', width: '100%', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-          >
-            {savingProfile
-              ? (language === 'en' ? 'Saving…' : 'সংরক্ষণ হচ্ছে…')
-              : (language === 'en' ? 'Save Changes' : 'পরিবর্তন সংরক্ষণ করুন')}
-          </button>
-        </form>
-      </div>
-
-      {/* ── Avatar Card ── */}
-      <div className="settings-card">
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-navy)', marginBottom: '1.5rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'Profile Photo' : 'প্রোফাইল ছবি'}
-        </h3>
-
-        {avatarSuccess && <div className="toast-success">{avatarSuccess}</div>}
-        {avatarError && <div className="toast-error">{avatarError}</div>}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-          <div className="avatar-preview">
-            {avatarUrl
-              ? <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span>{initials}</span>}
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '1rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-              {language === 'en'
-                ? 'JPG or PNG, max 2MB. Displayed on your profile and in the navigation bar.'
-                : 'JPG অথবা PNG, সর্বোচ্চ ২MB। আপনার প্রোফাইল এবং নেভিগেশন বারে প্রদর্শিত হবে।'}
-            </p>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleAvatarSelect}
-              style={{ display: 'none' }}
-            />
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              disabled={uploadingAvatar}
-              onClick={() => avatarInputRef.current?.click()}
-              style={{ fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-            >
-              {uploadingAvatar
-                ? (language === 'en' ? 'Uploading…' : 'আপলোড হচ্ছে…')
-                : avatarUrl
-                  ? (language === 'en' ? '📷 Change Photo' : '📷 ছবি পরিবর্তন')
-                  : (language === 'en' ? '📷 Upload Photo' : '📷 ছবি আপলোড')}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Danger Zone ── */}
-      <div className="settings-card" style={{ border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.02)' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#DC2626', marginBottom: '0.5rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'Sign Out' : 'সাইন আউট'}
-        </h3>
-        <p style={{ fontSize: '0.875rem', color: '#6B7280', marginBottom: '1.25rem', fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}>
-          {language === 'en' ? 'You will be signed out of your account on this device.' : 'এই ডিভাইসে আপনার অ্যাকাউন্ট থেকে সাইন আউট করা হবে।'}
-        </p>
-        <button
-          type="button"
-          className="btn btn-sm"
-          onClick={() => logout()}
-          style={{ background: 'rgba(239,68,68,0.1)', color: '#DC2626', border: '1px solid rgba(239,68,68,0.25)', fontWeight: 600, fontFamily: language === 'bn' ? 'var(--font-bangla)' : 'inherit' }}
-        >
-          {language === 'en' ? 'Sign Out' : 'সাইন আউট'}
-        </button>
-      </div>
+            <Button size="lg" disabled={saving} onClick={save}>
+              {saving ? <><Loader2 className="size-4 animate-spin" />…</> : <><Save className="size-4" /> {t('shared.save')}</>}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
