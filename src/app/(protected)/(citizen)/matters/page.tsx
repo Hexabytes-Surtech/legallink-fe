@@ -67,12 +67,12 @@ export default function MattersPage() {
   const refresh = () => { mattersQ.refetch(); consultsQ.refetch(); };
   const loading = mattersQ.loading && matters.length === 0;
 
-  const rows = matters.map((m) => ({ matter: m, consult: consultByMatter.get(m.matter_id) }));
+  const rows = matters.map((m) => ({ matter: m, consult: consultByMatter.get(m.matterId) }));
   const active = rows.filter((r) => r.consult && (r.consult.status === 'pending' || r.consult.status === 'accepted'));
   const closed = rows.filter((r) => r.consult && (r.consult.status === 'closed' || r.consult.status === 'declined'));
 
   return (
-    <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">{t('matters.title')}</h1>
@@ -125,12 +125,12 @@ function RowList({
     return <p className="py-10 text-center text-sm text-muted-foreground">{tr('matters.empty')}</p>;
   }
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-2">
       {rows.map(({ matter, consult }) => {
         const badge = consult ? STATUS_BADGE[consult.status] : null;
         const scheduled = consult?.appointmentStatus === 'scheduled' && consult.appointmentId && consult.scheduledAt;
         return (
-          <Card key={matter.matter_id}>
+          <Card key={matter.matterId}>
             <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -149,7 +149,7 @@ function RowList({
               </div>
 
               <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
-                <Button asChild variant="outline" size="sm"><Link href={`/matter/${matter.matter_id}`}><FileText className="size-4" /> {tr('matters.viewMatter')}</Link></Button>
+                <Button asChild variant="outline" size="sm"><Link href={`/matter/${matter.matterId}`}><FileText className="size-4" /> {tr('matters.viewMatter')}</Link></Button>
                 {consult?.status === 'accepted' && (
                   <Button asChild size="sm"><Link href={`/chat/${consult.consultationId}`}><MessageSquare className="size-4" /> {tr('matters.openChat')}</Link></Button>
                 )}

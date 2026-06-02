@@ -1,6 +1,10 @@
 'use client';
 
+import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { ShieldCheck, Sparkles, BadgeCheck, Languages as LangIcon, ArrowRight } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Spinner } from '@/components/shared/spinner';
 import { Navbar } from '@/components/shared/navbar';
 import { Footer } from '@/components/shared/footer';
 import { AuroraBackground } from '@/components/aceternity/aurora-background';
@@ -26,9 +30,36 @@ const FEATURES = [
 
 const PRACTICE = ['Tenancy', 'Family', 'Criminal', 'Labour', 'Consumer', 'Property', 'Traffic', 'Civil'];
 
+const ROLE_HOME: Record<string, string> = {
+  citizen: '/dashboard',
+  advocate: '/advocate/dashboard',
+  admin: '/admin',
+};
+
 export default function LandingPage() {
   const { t, language } = useLanguage();
   const isBn = language === 'bn';
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  // The public landing page is the anonymous-citizen entry point (marketing +
+  // matter intake). A signed-in user has no business here — send them to the
+  // workspace for their role instead of showing them the public CTAs.
+  React.useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      router.replace(ROLE_HOME[user.role] ?? '/dashboard');
+    }
+  }, [isLoading, isAuthenticated, user, router]);
+
+  // While the session is restoring, or while we redirect an authed user away,
+  // hold the public marketing content back to avoid a flash of the wrong UI.
+  if (isLoading || isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner className="size-7" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: ['/', '/auth/signup', '/auth/advocate-signup'],
-        disallow: ['/admin/', '/advocate/', '/chat/', '/matter/', '/matters/'],
+        disallow: ['/admin/', '/advocate/', '/advocates/', '/chat/', '/matter/', '/matters/', '/dashboard/', '/profile/', '/settings/'],
       },
     ],
     sitemap: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.in'}/sitemap.xml`,

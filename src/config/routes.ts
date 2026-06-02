@@ -6,8 +6,11 @@ export const ROUTES = {
     ADVOCATE_SIGNUP: '/auth/advocate-signup',
   },
   APP: {
+    DASHBOARD: '/dashboard',
+    PROFILE: '/profile',
     INTAKE: '/intake',
     MATTERS: '/matters',
+    ADVOCATES: '/advocates',
     MATTER_DETAIL: (id: string) => `/matter/${id}`,
     CHAT: (consultationId: string) => `/chat/${consultationId}`,
   },

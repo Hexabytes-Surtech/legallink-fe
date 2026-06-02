@@ -19,9 +19,17 @@ import type { Role } from '@/types';
 import { cn } from '@/lib/utils';
 
 const ROLE_HOME: Record<Role, string> = {
-  citizen: '/matters',
+  citizen: '/dashboard',
   advocate: '/advocate/dashboard',
   admin: '/admin',
+};
+
+// Where the "Profile/Settings" dropdown entry points, per role. Each role's
+// profile lives inside its own console; admin uses the generic settings page.
+const ROLE_PROFILE: Record<Role, string> = {
+  citizen: '/profile',
+  advocate: '/advocate/profile',
+  admin: '/settings',
 };
 
 const PUBLIC_LINKS = [
@@ -47,6 +55,7 @@ export function Navbar() {
   }, []);
 
   const home = user ? ROLE_HOME[user.role] : '/';
+  const profileHref = user ? ROLE_PROFILE[user.role] : '/settings';
 
   return (
     <header
@@ -100,7 +109,7 @@ export function Navbar() {
                   <Link href={home}><LayoutDashboard /> Dashboard</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/settings"><Settings /> Settings</Link>
+                  <Link href={profileHref}><Settings /> {user.role === 'citizen' ? 'Profile' : 'Settings'}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
@@ -156,7 +165,7 @@ export function Navbar() {
                 ) : (
                   <>
                     <SheetClose asChild>
-                      <Button asChild variant="outline"><Link href="/settings"><Settings /> Settings</Link></Button>
+                      <Button asChild variant="outline"><Link href={profileHref}><Settings /> {user?.role === 'citizen' ? 'Profile' : 'Settings'}</Link></Button>
                     </SheetClose>
                     <Button variant="ghost" className="text-destructive" onClick={() => logout()}>
                       <LogOut /> Sign out

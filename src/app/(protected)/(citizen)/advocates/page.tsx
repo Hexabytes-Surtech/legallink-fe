@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Search, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
@@ -49,7 +50,7 @@ export default function AdvocatesPage() {
   const data = q.data;
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
       <Reveal>
         <header className="max-w-2xl">
           <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{t('advocates.title')}</h1>
@@ -87,7 +88,7 @@ export default function AdvocatesPage() {
                 <AdvocateCard
                   key={adv.id}
                   advocate={adv}
-                  action={<Button asChild variant="outline" className="w-full"><a href={`/advocates/${adv.id}`}>{t('common.viewProfile')}</a></Button>}
+                  action={<Button asChild variant="outline" className="w-full"><Link href={`/advocates/${adv.id}`}>{t('common.viewProfile')}</Link></Button>}
                 />
               ))}
             </div>

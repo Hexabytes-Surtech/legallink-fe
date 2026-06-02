@@ -39,7 +39,7 @@ export default function AdvocateLayout({ children }: { children: React.ReactNode
 
   // Role guard (parent layout already guarantees authentication).
   React.useEffect(() => {
-    if (user && user.role !== 'advocate') router.replace('/matters');
+    if (user && user.role !== 'advocate') router.replace('/dashboard');
   }, [user, router]);
 
   const meQ = useQuery<AdvocateSelf>(() => api.get('/advocate/me'), [], { enabled: user?.role === 'advocate' });

@@ -1,9 +1,30 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AuthOtpForm } from '@/components/features/auth-otp-form';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+function SignupInner() {
+  const { t } = useLanguage();
+  const searchParams = useSearchParams();
+  // Honour ?returnTo=… set by access guards; only allow internal paths.
+  const raw = searchParams.get('returnTo');
+  const returnTo = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : undefined;
+  const loginHref = returnTo ? `/auth/login?returnTo=${encodeURIComponent(returnTo)}` : '/auth/login';
+
+  return (
+    <>
+      <AuthOtpForm mode="signup" redirectTo={returnTo} />
+      <p className="text-center text-sm text-muted-foreground">
+        {t('auth.haveAccount')}{' '}
+        <Link href={loginHref} className="font-semibold text-primary hover:underline">{t('nav.login')}</Link>
+      </p>
+    </>
+  );
+}
 
 export default function SignupPage() {
   const { t } = useLanguage();
@@ -14,11 +35,9 @@ export default function SignupPage() {
         <CardDescription>{t('auth.signup.subtitle')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <AuthOtpForm mode="signup" />
-        <p className="text-center text-sm text-muted-foreground">
-          {t('auth.haveAccount')}{' '}
-          <Link href="/auth/login" className="font-semibold text-primary hover:underline">{t('nav.login')}</Link>
-        </p>
+        <React.Suspense fallback={<AuthOtpForm mode="signup" />}>
+          <SignupInner />
+        </React.Suspense>
         <p className="text-center text-xs text-muted-foreground">
           Are you an advocate?{' '}
           <Link href="/auth/advocate-signup" className="font-medium text-primary hover:underline">{t('nav.forAdvocates')}</Link>

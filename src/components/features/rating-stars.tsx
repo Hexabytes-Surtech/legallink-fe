@@ -8,15 +8,18 @@ export function RatingStars({
   size = 'sm',
   className,
 }: {
-  rating: number | null;
-  count?: number;
+  // Backend may send these as numeric strings ("4.5" / "12") — coerce defensively.
+  rating: number | string | null;
+  count?: number | string;
   size?: 'sm' | 'md';
   className?: string;
 }) {
-  const value = rating ?? 0;
+  const num = rating == null ? null : Number(rating);
+  const value = num == null || Number.isNaN(num) ? 0 : num;
+  const reviewCount = count == null ? null : Number(count);
   const dim = size === 'md' ? 'size-4' : 'size-3.5';
 
-  if (rating == null || (count != null && count === 0)) {
+  if (num == null || Number.isNaN(num) || reviewCount === 0) {
     return <span className={cn('text-xs text-muted-foreground', className)}>No reviews yet</span>;
   }
 
@@ -32,7 +35,9 @@ export function RatingStars({
         ))}
       </span>
       <span className="text-xs font-semibold text-foreground">{value.toFixed(1)}</span>
-      {count != null && <span className="text-xs text-muted-foreground">({count})</span>}
+      {reviewCount != null && !Number.isNaN(reviewCount) && (
+        <span className="text-xs text-muted-foreground">({reviewCount})</span>
+      )}
     </span>
   );
 }

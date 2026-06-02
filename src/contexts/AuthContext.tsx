@@ -24,7 +24,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const ROLE_HOME: Record<Role, string> = {
-  citizen: '/matters',
+  citizen: '/dashboard',
   advocate: '/advocate/dashboard',
   admin: '/admin',
 };

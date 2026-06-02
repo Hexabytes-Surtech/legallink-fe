@@ -123,23 +123,18 @@ export interface MatterDetail {
   aiResponse: AiResponse | null;    // null while processing / on failure
 }
 
-// GET /matter — citizen's list rows
+// GET /matter — citizen's list rows.
+// Backend (matter.service.listMattersForCitizen) returns camelCase aliases.
 export interface MatterListItem {
-  matter_id: string;
+  matterId: string;
   status: string;
   query: string;
   language: Language;
-  created_at: string;
-  updated_at: string;
-  unread?: number;
-  consultationId?: string | null;
-  advocate_id?: string | null;
-  advocateName?: string | null;
-  advocateVerificationStatus?: VerificationStatus | null;
-  matterBrief?: string | null;
-  appointmentId?: string | null;
-  scheduledAt?: string | null;
-  appointmentStatus?: AppointmentStatus | null;
+  classification: Classification | null;
+  createdAt: string;
+  updatedAt: string;
+  consultationStatus: ConsultationStatus | null;
+  advocateId: string | null;
 }
 
 export interface MatterDocument {

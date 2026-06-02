@@ -5,106 +5,109 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================================
-   LegalLink design tokens
+   LegalLink design tokens — "Indigo Aurora"
    Two themes share one token contract:
-     :root  -> "Premium Light"  (warm cream, navy ink, deep gold)
-     .dark  -> "Wow Dark"       (near-black navy, bright gold, glass)
+     :root  -> Light  (cool off-white, indigo ink, electric-indigo primary)
+     .dark  -> Dark   (near-black indigo, electric indigo + violet, glass)
+   NB: the brand-accent token is still named `--gold` (and `--gold-bright`) so
+   every existing `text-gold / glow-gold / text-gradient-gold` utility re-skins
+   automatically — it now points at indigo/violet, not gold.
    ========================================================================== */
 :root {
-  --radius: 0.75rem;
+  --radius: 0.85rem;
 
-  --background: #faf8f3;
-  --foreground: #14202e;
+  --background: #f6f7fb;
+  --foreground: #16182b;
 
   --card: #ffffff;
-  --card-foreground: #14202e;
+  --card-foreground: #16182b;
 
   --popover: #ffffff;
-  --popover-foreground: #14202e;
+  --popover-foreground: #16182b;
 
-  /* Primary = signature gold (consistent CTA across themes) */
-  --primary: #b58a2e;
-  --primary-foreground: #1a1206;
+  /* Primary = electric indigo (consistent CTA across themes) */
+  --primary: #5b4fe0;
+  --primary-foreground: #ffffff;
 
-  /* Secondary = navy */
-  --secondary: #0d1b2a;
-  --secondary-foreground: #f8f5f0;
+  /* Secondary = low-emphasis indigo-gray surface */
+  --secondary: #eaebf6;
+  --secondary-foreground: #2c2f4e;
 
-  --muted: #f0ece3;
-  --muted-foreground: #6b6657;
+  --muted: #eef0f7;
+  --muted-foreground: #5e6488;
 
   /* Accent = subtle hover surface */
-  --accent: #f1ebdd;
-  --accent-foreground: #14202e;
+  --accent: #ecedf8;
+  --accent-foreground: #16182b;
 
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 
-  --border: #e7e0d2;
-  --input: #e2dacb;
-  --ring: #c9a84c;
+  --border: #e3e4f0;
+  --input: #d9dbec;
+  --ring: #5b4fe0;
 
-  /* Brand + semantic extras (theme-aware) */
-  --gold: #b58a2e;
-  --gold-bright: #c9a84c;
-  --navy: #0d1b2a;
-  --wine: #8f2638;
-  --cream: #f8f5f0;
-  --success: #15803d;
+  /* Brand + semantic extras (theme-aware). `gold` = indigo, `gold-bright` = violet. */
+  --gold: #5b4fe0;
+  --gold-bright: #8b5cf6;
+  --navy: #16182b;
+  --wine: #db2777;
+  --cream: #f6f7fb;
+  --success: #0d9488;
   --warning: #b45309;
-  --info: #1d4ed8;
+  --info: #2563eb;
 
   /* Glass + glow (used by Aceternity-style components) */
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(20, 32, 46, 0.08);
-  --glow: rgba(201, 168, 76, 0.28);
-  --hero-grid: rgba(20, 32, 46, 0.05);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(22, 24, 43, 0.08);
+  --glow: rgba(91, 79, 224, 0.26);
+  --hero-grid: rgba(22, 24, 43, 0.05);
 
-  --shadow-color: 20 32 46;
+  --shadow-color: 30 27 75;
 }
 
 .dark {
-  --background: #070c13;
-  --foreground: #e8ebef;
+  --background: #0b0d1a;
+  --foreground: #e7e9f5;
 
-  --card: #0e1722;
-  --card-foreground: #e8ebef;
+  --card: #12152a;
+  --card-foreground: #e7e9f5;
 
-  --popover: #0e1722;
-  --popover-foreground: #e8ebef;
+  --popover: #12152a;
+  --popover-foreground: #e7e9f5;
 
-  --primary: #d8b45a;
-  --primary-foreground: #1a1206;
+  --primary: #6d5ef6;
+  --primary-foreground: #ffffff;
 
-  --secondary: #16212e;
-  --secondary-foreground: #e8ebef;
+  --secondary: #1a1e36;
+  --secondary-foreground: #e7e9f5;
 
-  --muted: #131d29;
-  --muted-foreground: #93a1b0;
+  --muted: #161a30;
+  --muted-foreground: #9aa0c2;
 
-  --accent: #18242f;
-  --accent-foreground: #e8ebef;
+  --accent: #1c2140;
+  --accent-foreground: #e7e9f5;
 
-  --destructive: #ef4444;
+  --destructive: #f2555a;
   --destructive-foreground: #ffffff;
 
-  --border: rgba(255, 255, 255, 0.09);
-  --input: rgba(255, 255, 255, 0.14);
-  --ring: #d8b45a;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #6d5ef6;
 
-  --gold: #d8b45a;
-  --gold-bright: #f0cd7e;
-  --navy: #0d1b2a;
-  --wine: #d06d82;
-  --cream: #f8f5f0;
-  --success: #34d399;
+  --gold: #6d5ef6;
+  --gold-bright: #a78bfa;
+  --navy: #0b0d1a;
+  --wine: #f472b6;
+  --cream: #e7e9f5;
+  --success: #2dd4bf;
   --warning: #fbbf24;
   --info: #60a5fa;
 
-  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg: rgba(255, 255, 255, 0.045);
   --glass-border: rgba(255, 255, 255, 0.1);
-  --glow: rgba(216, 180, 90, 0.35);
-  --hero-grid: rgba(255, 255, 255, 0.04);
+  --glow: rgba(109, 94, 246, 0.42);
+  --hero-grid: rgba(255, 255, 255, 0.045);
 
   --shadow-color: 0 0 0;
 }
@@ -251,6 +254,23 @@
   .glow-gold {
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent),
                 0 8px 40px -8px var(--glow);
+  }
+
+  /* Signature brand gradient (indigo → violet) for hero bands + key CTAs */
+  .bg-brand-gradient {
+    background-image: linear-gradient(120deg, var(--gold) 0%, var(--gold-bright) 100%);
+  }
+  .bg-brand-soft {
+    background-image:
+      radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--gold) 22%, transparent) 0%, transparent 55%),
+      radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--gold-bright) 22%, transparent) 0%, transparent 55%);
+  }
+  /* Aurora blobs behind hero content */
+  .bg-aurora-blobs {
+    background-image:
+      radial-gradient(40% 60% at 15% 10%, color-mix(in srgb, var(--gold) 32%, transparent) 0%, transparent 60%),
+      radial-gradient(45% 55% at 90% 0%, color-mix(in srgb, var(--gold-bright) 30%, transparent) 0%, transparent 60%),
+      radial-gradient(50% 60% at 60% 100%, color-mix(in srgb, var(--info) 18%, transparent) 0%, transparent 60%);
   }
 
   /* Editorial hairline grid background (light + dark aware) */
