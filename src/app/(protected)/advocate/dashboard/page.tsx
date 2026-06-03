@@ -44,15 +44,35 @@ export default function AdvocateDashboardPage() {
 
       {/* Verification banner */}
       {d && d.verificationStatus !== 'verified' && (
-        <Card className="mt-6 border-warning/40 bg-warning/5">
-          <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-start gap-2 text-sm text-foreground/80">
-              <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" />
-              {t('adv.dash.notVerified')}
-            </p>
-            <Button asChild className="shrink-0"><Link href="/advocate/onboarding">{t('adv.dash.finishOnboarding')} <ArrowRight className="size-4" /></Link></Button>
-          </CardContent>
-        </Card>
+        d.verificationStatus === 'rejected' ? (
+          <Card className="mt-6 border-destructive/40 bg-destructive/5">
+            <CardContent className="flex flex-col gap-3 py-5">
+              <p className="flex items-start gap-2 text-sm text-foreground/80">
+                <ShieldAlert className="mt-0.5 size-5 shrink-0 text-destructive" />
+                {t('adv.dash.rejected')}
+              </p>
+              {d.rejectionReason && (
+                <div className="rounded-md border border-destructive/20 bg-background px-3 py-2 text-sm">
+                  <span className="font-medium text-destructive">{t('adv.dash.rejectionReason')}: </span>
+                  <span className="text-foreground/80">{d.rejectionReason}</span>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button asChild variant="destructive" className="shrink-0"><Link href="/advocate/onboarding">{t('adv.dash.resubmit')} <ArrowRight className="size-4" /></Link></Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mt-6 border-warning/40 bg-warning/5">
+            <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex items-start gap-2 text-sm text-foreground/80">
+                <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" />
+                {t('adv.dash.notVerified')}
+              </p>
+              <Button asChild className="shrink-0"><Link href="/advocate/onboarding">{t('adv.dash.finishOnboarding')} <ArrowRight className="size-4" /></Link></Button>
+            </CardContent>
+          </Card>
+        )
       )}
 
       {/* Stat cards */}

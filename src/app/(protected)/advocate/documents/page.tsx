@@ -25,7 +25,7 @@ export default function AdvocateDocumentsPage() {
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('document', file);
       await api.upload('/advocate/documents', fd);
       toast.success(t('adv.docs.uploaded'));
       q.refetch();

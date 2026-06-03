@@ -81,7 +81,7 @@ export default function CitizenDashboardPage() {
               <div key={s.key} className="rounded-2xl border border-border/70 bg-background/50 px-4 py-3 backdrop-blur transition-colors hover:border-gold/40">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Icon className={`size-4 ${s.tint}`} />
-                  <span className="truncate text-[10px] font-medium uppercase tracking-wide sm:text-[11px]">{t(s.key)}</span>
+                  <span className="text-[10px] font-medium uppercase leading-tight tracking-wide sm:text-[11px]">{t(s.key)}</span>
                 </div>
                 {loading
                   ? <Skeleton className="mt-1.5 h-8 w-10" />

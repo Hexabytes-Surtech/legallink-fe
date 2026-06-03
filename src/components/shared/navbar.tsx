@@ -92,10 +92,10 @@ export function Navbar() {
           ) : isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Account menu">
+                <button className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${initials(user.name, user.email)} — Account menu`}>
                   <Avatar className="ring-1 ring-border">
                     {user.avatar_url && <AvatarImage src={user.avatar_url} alt="" />}
-                    <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
+                    <AvatarFallback aria-hidden="true">{initials(user.name, user.email)}</AvatarFallback>
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>

@@ -203,6 +203,7 @@ export interface MatchedAdvocatesResponse {
 export interface AdvocateDashboard {
   advocateId: string;
   verificationStatus: VerificationStatus;
+  rejectionReason: string | null;
   profileCompleteness: number;
   consultationStats: {
     pending_count: string | number;
