@@ -62,7 +62,8 @@ export function MatterIntake({
     setError('');
     setSubmitting(true);
     try {
-      const matter = await api.post<MatterDetail>('/matter', { query: trimmed, language: detectLanguage(trimmed) }, { skipAuth: true });
+      // Send token if logged in (matter is owned directly); anonymous users create session-owned matters.
+      const matter = await api.post<MatterDetail>('/matter', { query: trimmed, language: detectLanguage(trimmed) });
       rememberMatter(matter);
       router.push(`/matter/${matter.matterId}`);
     } catch (err) {

@@ -23,9 +23,11 @@ export default function MatterPage() {
   const { t, language } = useLanguage();
   const isBn = language === 'bn';
 
-  const matterQ = useQuery<MatterDetail>(() => api.get(`/matter/${id}`, { skipAuth: true }), [id]);
+  // No skipAuth: authenticated citizens send their token so the backend's OptionalJwtGuard
+  // can verify ownership of claimed matters. Anonymous users send no token (same endpoint, no error).
+  const matterQ = useQuery<MatterDetail>(() => api.get(`/matter/${id}`), [id]);
   const advocatesQ = useQuery<MatchedAdvocatesResponse>(
-    () => api.get(`/matter/${id}/advocates`, { skipAuth: true, query: { limit: 6 } }),
+    () => api.get(`/matter/${id}/advocates`, { query: { limit: 6 } }),
     [id],
   );
 

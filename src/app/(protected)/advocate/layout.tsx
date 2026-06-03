@@ -42,7 +42,8 @@ export default function AdvocateLayout({ children }: { children: React.ReactNode
     if (user && user.role !== 'advocate') router.replace('/dashboard');
   }, [user, router]);
 
-  const meQ = useQuery<AdvocateSelf>(() => api.get('/advocate/me'), [], { enabled: user?.role === 'advocate' });
+  // Re-fetch on every route change so the sidebar always reflects current verification_status.
+  const meQ = useQuery<AdvocateSelf>(() => api.get('/advocate/me'), [pathname], { enabled: user?.role === 'advocate' });
   const me = meQ.data;
 
   if (user && user.role !== 'advocate') {

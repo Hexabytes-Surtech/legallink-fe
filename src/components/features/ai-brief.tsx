@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CitationChip } from './citation-chip';
+import { displayPracticeArea } from './advocate-card';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translations, type TranslationKey } from '@/i18n/config';
 import type { MatterDetail, Classification } from '@/types';
@@ -86,7 +87,7 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {c.matterType && <Badge variant="default">{c.matterType}</Badge>}
+            {c.matterType && <Badge variant="default">{displayPracticeArea(c.matterType)}</Badge>}
             {c.primaryDomain && c.primaryDomain !== c.matterType && (
               <Badge variant="muted">{c.primaryDomain}</Badge>
             )}

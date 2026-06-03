@@ -13,6 +13,23 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'A';
 }
 
+// Normalise snake_case/slash practice area labels to the canonical Title Case display value.
+const PA_DISPLAY: Record<string, string> = {
+  criminal_matter: 'Criminal', criminal_offence: 'Criminal', criminal: 'Criminal',
+  civil_dispute: 'Civil', cheque_bounce: 'Civil', property_dispute: 'Civil', property: 'Civil', civil: 'Civil',
+  corporate: 'Civil', corporate_law: 'Civil',
+  family_law: 'Family', domestic_violence: 'Family', divorce: 'Family', maintenance: 'Family', dowry: 'Family', family: 'Family',
+  labour_dispute: 'Labour', labour_law: 'Labour', labour_employment: 'Labour', employment: 'Labour', workplace_harassment: 'Labour', labour: 'Labour',
+  tenancy_dispute: 'Tenancy', tenancy: 'Tenancy',
+  'motor_vehicle/traffic_offence': 'Traffic', motor_vehicle: 'Traffic', traffic_offence: 'Traffic',
+  consumer_complaint: 'Consumer', consumer_dispute: 'Consumer', consumer: 'Consumer',
+};
+export function displayPracticeArea(raw: string): string {
+  return PA_DISPLAY[raw.toLowerCase()] ?? PA_DISPLAY[raw] ?? raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function AdvocateCard({
   advocate,
   href,
@@ -25,6 +42,10 @@ export function AdvocateCard({
   className?: string;
 }) {
   const profileHref = href ?? `/advocates/${advocate.id}`;
+  // Defensive defaults: never let a missing array crash the whole page.
+  const practiceAreas = advocate.practice_areas ?? [];
+  const districts = advocate.districts ?? [];
+  const languages = advocate.languages ?? [];
 
   return (
     <GlowCard className={cn('flex flex-col gap-4', className)}>
@@ -49,20 +70,20 @@ export function AdvocateCard({
       {advocate.bio && <p className="line-clamp-2 text-sm text-muted-foreground">{advocate.bio}</p>}
 
       <div className="flex flex-wrap gap-1.5">
-        {advocate.practice_areas.slice(0, 4).map((a) => (
-          <Badge key={a} variant="gold">{a}</Badge>
+        {practiceAreas.slice(0, 4).map((a) => (
+          <Badge key={a} variant="gold">{displayPracticeArea(a)}</Badge>
         ))}
       </div>
 
       <div className="mt-auto flex flex-col gap-1.5 text-xs text-muted-foreground">
-        {advocate.districts.length > 0 && (
+        {districts.length > 0 && (
           <span className="inline-flex items-center gap-1.5">
-            <MapPin className="size-3.5" /> {advocate.districts.slice(0, 3).join(', ')}
+            <MapPin className="size-3.5" /> {districts.slice(0, 3).join(', ')}
           </span>
         )}
-        {advocate.languages.length > 0 && (
+        {languages.length > 0 && (
           <span className="inline-flex items-center gap-1.5">
-            <LangIcon className="size-3.5" /> {advocate.languages.map((l) => (l === 'bn' ? 'বাংলা' : l === 'en' ? 'English' : l)).join(', ')}
+            <LangIcon className="size-3.5" /> {languages.map((l) => (l === 'bn' ? 'বাংলা' : l === 'en' ? 'English' : l)).join(', ')}
           </span>
         )}
       </div>

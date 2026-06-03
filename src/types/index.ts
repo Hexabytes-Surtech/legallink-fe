@@ -263,6 +263,7 @@ export interface ConsultationListItem {
   appointmentId: string | null;
   scheduledAt: string | null;
   appointmentStatus: AppointmentStatus | null;
+  hasFeedback?: boolean;
 }
 
 export interface ConsultationDetail {

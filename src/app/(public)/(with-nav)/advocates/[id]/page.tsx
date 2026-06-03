@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { VerificationBadge } from '@/components/shared/verification-badge';
 import { RatingStars } from '@/components/features/rating-stars';
 import { ConnectDialog } from '@/components/features/connect-dialog';
+import { displayPracticeArea } from '@/components/features/advocate-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import type { AdvocateCardData, AdvocateFeedback, AvailabilityDay } from '@/types';
 
@@ -83,7 +84,7 @@ export default function AdvocateProfilePage() {
             <Card>
               <CardContent className="space-y-4 py-6">
                 <DetailRow label={t('matter.practiceAreas')}>
-                  {p.practice_areas?.map((a) => <Badge key={a} variant="gold">{a}</Badge>)}
+                  {p.practice_areas?.map((a) => <Badge key={a} variant="gold">{displayPracticeArea(a)}</Badge>)}
                 </DetailRow>
                 <Separator />
                 <DetailRow label={t('matter.languages')} icon={<LangIcon className="size-4" />}>

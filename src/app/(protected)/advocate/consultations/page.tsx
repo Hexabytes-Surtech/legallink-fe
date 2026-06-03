@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { displayPracticeArea } from '@/components/features/advocate-card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,7 +97,7 @@ function ConsultationCard({
       <CardContent className="space-y-3 py-5">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={st.variant} className="capitalize">{c.status}</Badge>
-          {c.classification?.matterType && <Badge variant="gold">{c.classification.matterType}</Badge>}
+          {c.classification?.matterType && <Badge variant="gold">{displayPracticeArea(c.classification.matterType)}</Badge>}
           <span className="text-xs text-muted-foreground">{tr('adv.consult.from')} {c.citizen_name || 'Citizen'}</span>
         </div>
 

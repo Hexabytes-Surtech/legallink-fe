@@ -42,7 +42,8 @@ export default function CitizenLayout({ children }: { children: React.ReactNode 
     else if (user.role === 'admin') router.replace('/admin');
   }, [user, router]);
 
-  const meQ = useQuery<UserProfile>(() => api.get('/user/me'), [], { enabled: isCitizen });
+  // Re-fetch on every route change so the sidebar always shows current name/avatar.
+  const meQ = useQuery<UserProfile>(() => api.get('/user/me'), [pathname], { enabled: isCitizen });
   const me = meQ.data;
   const { uploading, openPicker, inputRef, onChange } = useAvatarUpload();
 

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { FileText, MessageSquare, Star, CalendarClock, XCircle, Plus } from 'lucide-react';
+import { FileText, MessageSquare, Star, CalendarClock, XCircle, Plus, CheckCircle2, Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -151,14 +151,22 @@ function RowList({
               <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
                 <Button asChild variant="outline" size="sm"><Link href={`/matter/${matter.matterId}`}><FileText className="size-4" /> {tr('matters.viewMatter')}</Link></Button>
                 {consult?.status === 'accepted' && (
-                  <Button asChild size="sm"><Link href={`/chat/${consult.consultationId}`}><MessageSquare className="size-4" /> {tr('matters.openChat')}</Link></Button>
+                  <>
+                    <Button asChild size="sm"><Link href={`/chat/${consult.consultationId}`}><MessageSquare className="size-4" /> {tr('matters.openChat')}</Link></Button>
+                    <CloseConsultationButton consultationId={consult.consultationId} onDone={onChanged} />
+                  </>
                 )}
-                {consult?.status === 'closed' && (
+                {consult?.status === 'closed' && !consult.hasFeedback && (
                   <FeedbackDialog
                     consultationId={consult.consultationId}
                     onDone={onChanged}
                     trigger={<Button size="sm" variant="secondary"><Star className="size-4" /> {tr('matters.leaveFeedback')}</Button>}
                   />
+                )}
+                {consult?.status === 'closed' && consult.hasFeedback && (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Star className="size-3.5 fill-gold text-gold" /> Feedback submitted
+                  </p>
                 )}
                 {scheduled && (
                   <>
@@ -179,5 +187,36 @@ function RowList({
         );
       })}
     </div>
+  );
+}
+
+function CloseConsultationButton({ consultationId, onDone }: { consultationId: string; onDone: () => void }) {
+  const [confirming, setConfirming] = React.useState(false);
+  const closeM = useMutation(() => api.put(`/consultations/${consultationId}/close`));
+
+  async function handleClose() {
+    if (!confirming) { setConfirming(true); return; }
+    try {
+      await closeM.mutate();
+      toast.success('Consultation closed');
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.first : 'Failed to close');
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant={confirming ? 'destructive' : 'outline'}
+      disabled={closeM.loading}
+      onClick={handleClose}
+      onBlur={() => setConfirming(false)}
+    >
+      {closeM.loading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+      {confirming ? 'Confirm close?' : 'Close consultation'}
+    </Button>
   );
 }
