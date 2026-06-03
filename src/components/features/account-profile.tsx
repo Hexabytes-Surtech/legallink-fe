@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback } from '@/components/ui/avatar';
+import { ViewableAvatar } from '@/components/shared/viewable-avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +44,7 @@ export function AccountProfile() {
   const [avatar, setAvatar] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
 
-  const { uploading, openPicker, inputRef, onChange } = useAvatarUpload(setAvatar);
+  const { uploading, openPicker, inputRef, onChange, cropper } = useAvatarUpload(setAvatar);
 
   React.useEffect(() => {
     if (meQ.data) {
@@ -81,67 +82,76 @@ export function AccountProfile() {
   return (
     <Card>
       <CardHeader><CardTitle>{t('settings.profile')}</CardTitle></CardHeader>
-      <CardContent className="space-y-6">
-        {/* Avatar with edit pencil */}
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Avatar className="size-20 ring-1 ring-border">
-              {avatar && <AvatarImage src={avatar} alt="" />}
-              <AvatarFallback className="text-xl">{initials}</AvatarFallback>
-            </Avatar>
-            <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onChange} />
-            <button
-              type="button"
-              onClick={openPicker}
-              disabled={uploading}
-              aria-label={t('settings.avatar')}
-              className="absolute -bottom-1 -right-1 grid size-8 place-items-center rounded-full border border-border bg-background text-foreground shadow-soft transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
-            >
-              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-3.5" />}
-            </button>
+      <CardContent>
+        <div className="flex flex-col gap-6 md:flex-row-reverse md:items-start md:gap-8">
+          {/* Avatar aside — right on desktop, enlarged */}
+          <div className="flex shrink-0 flex-col items-center gap-3 md:w-52">
+            <div className="relative">
+              <ViewableAvatar
+                src={avatar}
+                name={name || (user?.email?.split('@')[0] ?? '')}
+                className="size-36 ring-1 ring-border"
+                fallback={<AvatarFallback className="text-3xl">{initials}</AvatarFallback>}
+              />
+              <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onChange} />
+              <button
+                type="button"
+                onClick={openPicker}
+                disabled={uploading}
+                aria-label={t('settings.avatar')}
+                className="absolute bottom-1 right-1 grid size-9 place-items-center rounded-full border border-border bg-background text-foreground shadow-soft transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
+              >
+                {uploading ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-4" />}
+              </button>
+            </div>
+            <div className="text-center">
+              <p className="font-display text-lg font-semibold">{name || (user?.email?.split('@')[0] ?? '')}</p>
+              <p className="break-all text-sm text-muted-foreground">{meQ.data?.email ?? user?.email}</p>
+              {joined && <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.memberSince')} {joined}</p>}
+            </div>
+            {cropper}
           </div>
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg font-semibold">{name || (user?.email?.split('@')[0] ?? '')}</p>
-            <p className="truncate text-sm text-muted-foreground">{meQ.data?.email ?? user?.email}</p>
-            {joined && <p className="mt-0.5 text-xs text-muted-foreground">{t('profile.memberSince')} {joined}</p>}
-          </div>
-        </div>
 
-        {/* Read-only account */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>{t('settings.email')}</Label>
-            <Input value={meQ.data?.email ?? user?.email ?? ''} disabled />
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t('settings.role')}</Label>
-            <div className="flex h-11 items-center"><Badge variant="gold" className="capitalize">{meQ.data?.role ?? user?.role}</Badge></div>
-          </div>
-        </div>
+          {/* Form — fills the remaining width */}
+          <div className="min-w-0 flex-1 space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Read-only */}
+              <div className="space-y-1.5">
+                <Label>{t('settings.email')}</Label>
+                <Input value={meQ.data?.email ?? user?.email ?? ''} disabled />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('settings.role')}</Label>
+                <div className="flex h-11 items-center"><Badge variant="gold" className="capitalize">{meQ.data?.role ?? user?.role}</Badge></div>
+              </div>
 
-        {/* Editable */}
-        <div className="space-y-1.5">
-          <Label htmlFor="ap-name">{t('settings.name')}</Label>
-          <Input id="ap-name" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="ap-addr">{t('settings.address')}</Label>
-          <Textarea id="ap-addr" value={address} onChange={(e) => setAddress(e.target.value)} className="min-h-20" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>{t('settings.language')}</Label>
-          <Select value={lang} onValueChange={(v) => setLang(v as Language)}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="bn">বাংলা</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+              {/* Editable */}
+              <div className="space-y-1.5">
+                <Label htmlFor="ap-name">{t('settings.name')}</Label>
+                <Input id="ap-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('settings.language')}</Label>
+                <Select value={lang} onValueChange={(v) => setLang(v as Language)}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="bn">বাংলা</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <Button size="lg" disabled={saving} onClick={save}>
-          {saving ? <><Loader2 className="size-4 animate-spin" />…</> : <><Save className="size-4" /> {t('shared.save')}</>}
-        </Button>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="ap-addr">{t('settings.address')}</Label>
+                <Textarea id="ap-addr" value={address} onChange={(e) => setAddress(e.target.value)} className="min-h-20" />
+              </div>
+            </div>
+
+            <Button size="lg" disabled={saving} onClick={save}>
+              {saving ? <><Loader2 className="size-4 animate-spin" />…</> : <><Save className="size-4" /> {t('shared.save')}</>}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

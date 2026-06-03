@@ -2,21 +2,19 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, BadgeCheck } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AdvocateCard, AdvocateCardSkeleton } from '@/components/features/advocate-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/empty-state';
-import { Reveal } from '@/components/shared/reveal';
+import { PRACTICE_AREAS } from '@/lib/practice-areas';
+import { cn } from '@/lib/utils';
 import type { AdvocateDirectoryResponse } from '@/types';
 
 const ALL = '__all__';
-const PRACTICE_AREAS = ['Criminal', 'Civil', 'Family', 'Labour', 'Tenancy', 'Traffic', 'Consumer'];
 const DISTRICTS = ['Kolkata', 'Howrah', 'North 24 Parganas', 'South 24 Parganas', 'Hooghly', 'Nadia', 'Darjeeling', 'Murshidabad'];
 const LANGUAGES = [{ v: 'en', l: 'English' }, { v: 'bn', l: 'বাংলা' }];
 
@@ -39,7 +37,9 @@ export default function AdvocatesPage() {
           practiceArea: practiceArea === ALL ? undefined : practiceArea,
           language: lang === ALL ? undefined : lang,
           district: district === ALL ? undefined : district,
-          verifiedOnly: verifiedOnly ? true : undefined,
+          // Send the real boolean — `false` must reach the backend so it shows
+          // unverified advocates too (omitting it makes the backend default to verified).
+          verifiedOnly,
           page,
           limit: 9,
         },
@@ -50,40 +50,44 @@ export default function AdvocatesPage() {
   const data = q.data;
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-      <Reveal>
-        <header className="max-w-2xl">
-          <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{t('advocates.title')}</h1>
-          <p className="mt-3 text-muted-foreground">{t('advocates.subtitle')}</p>
-        </header>
-      </Reveal>
-
-      {/* Filters */}
-      <div className="mt-8 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card/50 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <SlidersHorizontal className="size-4" />
-        </div>
-        <FilterSelect label={t('advocates.filter.area')} value={practiceArea} onChange={setPracticeArea}
-          options={PRACTICE_AREAS.map((a) => ({ v: a, l: a }))} allLabel={t('advocates.filter.all')} />
-        <FilterSelect label={t('advocates.filter.language')} value={lang} onChange={setLang}
-          options={LANGUAGES.map((x) => ({ v: x.v, l: x.l }))} allLabel={t('advocates.filter.all')} />
-        <FilterSelect label={t('advocates.filter.district')} value={district} onChange={setDistrict}
-          options={DISTRICTS.map((d) => ({ v: d, l: d }))} allLabel={t('advocates.filter.all')} />
-        <div className="flex items-center gap-2 pb-2.5">
-          <Switch id="verified" checked={verifiedOnly} onCheckedChange={setVerifiedOnly} />
-          <Label htmlFor="verified" className="cursor-pointer">{t('advocates.filter.verified')}</Label>
+    <div className="flex flex-1 flex-col">
+      {/* Sticky title + filters (stick just below the console header) */}
+      <div className="sticky top-14 z-20 border-b border-border bg-background shadow-sm">
+        <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6">
+          <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">{t('advocates.title')}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <FilterSelect value={practiceArea} onChange={setPracticeArea}
+              options={PRACTICE_AREAS.map((a) => ({ v: a, l: a }))} allLabel={t('advocates.filter.area')} />
+            <FilterSelect value={district} onChange={setDistrict}
+              options={DISTRICTS.map((d) => ({ v: d, l: d }))} allLabel={t('advocates.filter.district')} />
+            <FilterSelect value={lang} onChange={setLang}
+              options={LANGUAGES.map((x) => ({ v: x.v, l: x.l }))} allLabel={t('advocates.filter.language')} />
+            <button
+              type="button"
+              onClick={() => setVerifiedOnly((v) => !v)}
+              aria-pressed={verifiedOnly}
+              className={cn(
+                'inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors',
+                verifiedOnly
+                  ? 'border-success/40 bg-success/10 text-success'
+                  : 'border-border text-muted-foreground hover:bg-accent',
+              )}
+            >
+              <BadgeCheck className="size-4" /> {t('advocates.filter.verified')}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Results */}
-      <div className="mt-8">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
         {q.loading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => <AdvocateCardSkeleton key={i} />)}
           </div>
         ) : data && data.advocates.length > 0 ? (
           <>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
               {data.advocates.map((adv) => (
                 <AdvocateCard
                   key={adv.id}
@@ -113,24 +117,22 @@ export default function AdvocatesPage() {
 }
 
 function FilterSelect({
-  label, value, onChange, options, allLabel,
+  value, onChange, options, allLabel,
 }: {
-  label: string;
   value: string;
   onChange: (v: string) => void;
   options: { v: string; l: string }[];
   allLabel: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-10 w-40"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>{allLabel}</SelectItem>
-          {options.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
-        </SelectContent>
-      </Select>
-    </div>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={cn('h-9 w-auto min-w-[8.5rem] gap-1.5 rounded-lg', value !== ALL && 'border-gold/45 text-foreground')}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL}>{allLabel}</SelectItem>
+        {options.map((o) => <SelectItem key={o.v} value={o.v}>{o.l}</SelectItem>)}
+      </SelectContent>
+    </Select>
   );
 }

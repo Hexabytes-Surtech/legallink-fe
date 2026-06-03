@@ -78,7 +78,7 @@ export default function AdvocateConsultationDetailPage() {
               </>
             )}
             {c.status === 'accepted' && (
-              <Button asChild><Link href={`/chat/${id}`}><MessageSquare className="size-4" /> {t('adv.consult.openChat')}</Link></Button>
+              <Button asChild><Link href={`/advocate/messages/${id}`}><MessageSquare className="size-4" /> {t('adv.consult.openChat')}</Link></Button>
             )}
           </div>
 

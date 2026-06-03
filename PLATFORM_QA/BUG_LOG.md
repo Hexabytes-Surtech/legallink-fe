@@ -44,3 +44,27 @@ Severity: 🔴 blocker · 🟠 major · 🟡 minor · 🔵 polish/perf/best-prac
 - **Fix:** what changed
 - **Verified:** ✅ re-ran test <ID> iteration <n+1>
 -->
+
+---
+
+## Iteration 2026-06-03 — Code-review remediation (Frontend_Review.txt)
+
+### Fixed
+
+| ID | Sev | File | Fix | Verified |
+|----|-----|------|-----|----------|
+| BUG-015 | 🔴 | advocate/onboarding/page.tsx | Verification-doc upload sent FormData field `file`; backend `FileInterceptor('document')` rejected it → advocates couldn't submit docs at onboarding step 4. Changed to `document`. (Only documents/page.tsx was patched in BUG-014; this was the primary upload site.) | ✅ live API: `file`→400, `document`→201 |
+| BUG-016 | 🟡 | (citizen)/matters/page.tsx + i18n/config.ts | Close/feedback UI had 5 hardcoded English strings in a bilingual app. Added `matters.feedbackSubmitted` + `matters.close.*` keys (EN+BN) and wired them. | ✅ typecheck + serve |
+| BUG-017 | 🟡 | components/features/ai-brief.tsx | Classification badges: dedup compared raw values but rendered a raw `primaryDomain`, producing duplicate/un-normalised badges. Now normalises both sides before compare/render. | ✅ typecheck + serve |
+| BUG-018 | 🟡 | lib/practice-areas.ts (new) | `displayPracticeArea` crashed on a null/empty array element (element-map callers guard the array, not items). Null-guarded; one fix covers all callers. | ✅ typecheck |
+| BUG-019 | 🟢 | lib/practice-areas.ts (new) | Three unlinked practice-area sources (advocate-card PA_DISPLAY, directory filter list, lib/constants) unified into one canonical module; formatter moved out of the UI component (resolves review #7 + #10). | ✅ typecheck + serve |
+| BUG-020 | 🟢 | (citizen)/matters/page.tsx | `CloseConsultationButton` two-click confirm cancelled on any incidental `onBlur` (tooltip/scroll-tap/SR focus shift). Replaced with a 4s auto-revert timer. | ✅ typecheck |
+| BUG-021 | 🟠 | app routing + matter/[id]/page.tsx | **Product decision (user 2026-06-03):** advocate directory must require login. Moved `/advocates` + `/advocates/[id]` from `(public)/(with-nav)` into `(protected)/(citizen)` → anonymous users redirect to `/auth/login?returnTo=…`; logged-in citizens browse inside the sidebar shell (this also resolves deferred review #2). Matter brief page now gates matched advocates: anonymous users see the AI brief + a "Sign up to see matched advocates" CTA (i18n EN+BN); matches fetch only when authenticated. | ✅ typecheck; user to verify live |
+
+### Deliberately deferred (not crash/data/security defects — left stable for testing)
+
+| Review # | Item | Why deferred |
+|----------|------|--------------|
+| 6 | `[pathname]` profile refetch is eager + misses in-place edits | Perf/freshness nuance; works. Proper fix = invalidate AuthContext on mutation (core-context change). |
+| 8 | `skipAuth` handled two ways for optional-auth endpoints | No live bug — backend doesn't personalise those reads. Unifying touches the core API client (high blast radius). |
+| 11 | Stale-token public matter read | Narrow async-boot edge, already mitigated by AuthContext clearing tokens on failed refresh. |

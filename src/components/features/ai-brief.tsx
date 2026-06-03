@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CitationChip } from './citation-chip';
-import { displayPracticeArea } from './advocate-card';
+import { displayPracticeArea } from '@/lib/practice-areas';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translations, type TranslationKey } from '@/i18n/config';
 import type { MatterDetail, Classification } from '@/types';
@@ -87,10 +87,21 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {c.matterType && <Badge variant="default">{displayPracticeArea(c.matterType)}</Badge>}
-            {c.primaryDomain && c.primaryDomain !== c.matterType && (
-              <Badge variant="muted">{c.primaryDomain}</Badge>
-            )}
+            {(() => {
+              // Normalise BOTH before comparing/rendering. The old code compared raw
+              // values but rendered a raw primaryDomain, so matterType='criminal_matter'
+              // + primaryDomain='Criminal' produced two identical "Criminal" badges.
+              const matterTypeLabel = c.matterType ? displayPracticeArea(c.matterType) : '';
+              const primaryDomainLabel = c.primaryDomain ? displayPracticeArea(c.primaryDomain) : '';
+              return (
+                <>
+                  {matterTypeLabel && <Badge variant="default">{matterTypeLabel}</Badge>}
+                  {primaryDomainLabel && primaryDomainLabel !== matterTypeLabel && (
+                    <Badge variant="muted">{primaryDomainLabel}</Badge>
+                  )}
+                </>
+              );
+            })()}
             {statute && <Badge variant="gold"><BookOpen className="size-3.5" />{statute}</Badge>}
             {loc && <Badge variant="muted"><MapPin className="size-3.5" />{loc}</Badge>}
             {c.involvesPolice && <Badge variant="warning">Police involved</Badge>}

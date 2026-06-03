@@ -417,6 +417,12 @@ export interface WsMessage {
   text: string;
   moderationStatus: ModerationStatus;
   timestamp: string;
+  // Optional file attachment (citizen → advocate). A pure attachment has empty text.
+  attachmentUrl?: string | null;
+  attachmentType?: 'image' | 'pdf';
+  attachmentName?: string;
+  attachmentSize?: number;
+  deleted?: boolean;
 }
 
 export interface WsWarning {

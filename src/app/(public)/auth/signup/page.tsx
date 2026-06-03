@@ -10,9 +10,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 function SignupInner() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  // Honour ?returnTo=… set by access guards; only allow internal paths.
+  // After signup we default to the user's own dashboard. We only RESUME a specific
+  // matter (returnTo=/matter/…) so new users finishing the anonymous-intake funnel land
+  // back on their matter; other targets drop to the dashboard.
   const raw = searchParams.get('returnTo');
-  const returnTo = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : undefined;
+  const returnTo = raw && raw.startsWith('/matter/') ? raw : undefined;
   const loginHref = returnTo ? `/auth/login?returnTo=${encodeURIComponent(returnTo)}` : '/auth/login';
 
   return (

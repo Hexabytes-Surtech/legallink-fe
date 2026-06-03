@@ -10,10 +10,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 function LoginInner() {
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  // Honour ?returnTo=… set by access guards (e.g. /advocates) so the user lands
-  // back where they came from. Only allow internal paths — never an open redirect.
+  // After login we default to the user's own dashboard (their home). We only RESUME a
+  // specific matter they were viewing (returnTo=/matter/…) — other targets like
+  // /advocates intentionally drop to the dashboard so users land on their home first.
   const raw = searchParams.get('returnTo');
-  const returnTo = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : undefined;
+  const returnTo = raw && raw.startsWith('/matter/') ? raw : undefined;
   const signupHref = returnTo ? `/auth/signup?returnTo=${encodeURIComponent(returnTo)}` : '/auth/signup';
 
   return (

@@ -7,7 +7,8 @@ import { ArrowLeft, MapPin, Languages as LangIcon, Building2, MessageSquareQuote
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback } from '@/components/ui/avatar';
+import { ViewableAvatar } from '@/components/shared/viewable-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { VerificationBadge } from '@/components/shared/verification-badge';
 import { RatingStars } from '@/components/features/rating-stars';
 import { ConnectDialog } from '@/components/features/connect-dialog';
-import { displayPracticeArea } from '@/components/features/advocate-card';
+import { uniquePracticeAreaLabels } from '@/lib/practice-areas';
 import { EmptyState } from '@/components/shared/empty-state';
 import type { AdvocateCardData, AdvocateFeedback, AvailabilityDay } from '@/types';
 
@@ -57,10 +58,12 @@ export default function AdvocateProfilePage() {
             {/* Header */}
             <Card>
               <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center">
-                <Avatar className="size-20 ring-1 ring-border">
-                  {p.avatar_url && <AvatarImage src={p.avatar_url} alt="" />}
-                  <AvatarFallback className="text-xl">{initials(p.name)}</AvatarFallback>
-                </Avatar>
+                <ViewableAvatar
+                  src={p.avatar_url}
+                  name={p.name}
+                  className="size-20 ring-1 ring-border"
+                  fallback={<AvatarFallback className="text-xl">{initials(p.name)}</AvatarFallback>}
+                />
                 <div className="min-w-0 flex-1">
                   <h1 className="font-display text-2xl font-semibold tracking-tight">{p.name}</h1>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -84,7 +87,7 @@ export default function AdvocateProfilePage() {
             <Card>
               <CardContent className="space-y-4 py-6">
                 <DetailRow label={t('matter.practiceAreas')}>
-                  {p.practice_areas?.map((a) => <Badge key={a} variant="gold">{displayPracticeArea(a)}</Badge>)}
+                  {uniquePracticeAreaLabels(p.practice_areas).map((label) => <Badge key={label} variant="gold">{label}</Badge>)}
                 </DetailRow>
                 <Separator />
                 <DetailRow label={t('matter.languages')} icon={<LangIcon className="size-4" />}>
@@ -149,7 +152,7 @@ export default function AdvocateProfilePage() {
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">{t('common.startMatter')}</p>
-                    <Button asChild size="lg" className="w-full"><Link href="/intake">{t('matters.empty.cta')}</Link></Button>
+                    <Button asChild size="lg" className="w-full"><Link href="/ask">{t('matters.empty.cta')}</Link></Button>
                   </>
                 )}
               </CardContent>

@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils';
  */
 export function GlowCard({
   className,
+  contentClassName,
   children,
   ...props
-}: React.ComponentProps<'div'>) {
+}: React.ComponentProps<'div'> & { contentClassName?: string }) {
   const ref = React.useRef<HTMLDivElement>(null);
 
   function handleMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -41,7 +42,7 @@ export function GlowCard({
             'radial-gradient(360px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--gold) 18%, transparent), transparent 60%)',
         }}
       />
-      <div className="relative z-10">{children}</div>
+      <div className={cn('relative z-10', contentClassName)}>{children}</div>
     </div>
   );
 }

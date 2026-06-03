@@ -78,7 +78,7 @@ export default function MattersPage() {
           <h1 className="font-display text-3xl font-semibold tracking-tight">{t('matters.title')}</h1>
           <p className="mt-1 text-muted-foreground">{t('matters.subtitle')}</p>
         </div>
-        <Button asChild><Link href="/intake"><Plus className="size-4" /> {t('matters.empty.cta')}</Link></Button>
+        <Button asChild><Link href="/ask"><Plus className="size-4" /> {t('matters.empty.cta')}</Link></Button>
       </div>
 
       {loading ? (
@@ -90,7 +90,7 @@ export default function MattersPage() {
           <EmptyState
             icon={FileText}
             title={t('matters.empty')}
-            action={<Button asChild><Link href="/intake">{t('matters.empty.cta')}</Link></Button>}
+            action={<Button asChild><Link href="/ask">{t('matters.empty.cta')}</Link></Button>}
           />
         </div>
       ) : (
@@ -152,8 +152,8 @@ function RowList({
                 <Button asChild variant="outline" size="sm"><Link href={`/matter/${matter.matterId}`}><FileText className="size-4" /> {tr('matters.viewMatter')}</Link></Button>
                 {consult?.status === 'accepted' && (
                   <>
-                    <Button asChild size="sm"><Link href={`/chat/${consult.consultationId}`}><MessageSquare className="size-4" /> {tr('matters.openChat')}</Link></Button>
-                    <CloseConsultationButton consultationId={consult.consultationId} onDone={onChanged} />
+                    <Button asChild size="sm"><Link href={`/messages/${consult.consultationId}`}><MessageSquare className="size-4" /> {tr('matters.openChat')}</Link></Button>
+                    <CloseConsultationButton consultationId={consult.consultationId} onDone={onChanged} t={tr} />
                   </>
                 )}
                 {consult?.status === 'closed' && !consult.hasFeedback && (
@@ -165,7 +165,7 @@ function RowList({
                 )}
                 {consult?.status === 'closed' && consult.hasFeedback && (
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Star className="size-3.5 fill-gold text-gold" /> Feedback submitted
+                    <Star className="size-3.5 fill-gold text-gold" /> {tr('matters.feedbackSubmitted')}
                   </p>
                 )}
                 {scheduled && (
@@ -190,18 +190,27 @@ function RowList({
   );
 }
 
-function CloseConsultationButton({ consultationId, onDone }: { consultationId: string; onDone: () => void }) {
+function CloseConsultationButton({ consultationId, onDone, t }: { consultationId: string; onDone: () => void; t: (k: TranslationKey) => string }) {
   const [confirming, setConfirming] = React.useState(false);
   const closeM = useMutation(() => api.put(`/consultations/${consultationId}/close`));
+
+  // Auto-revert the pending confirm after a few seconds instead of cancelling on
+  // onBlur — onBlur fired on any incidental focus shift (tooltip, scroll-tap, SR
+  // navigation), silently dropping the confirm state mid-interaction.
+  React.useEffect(() => {
+    if (!confirming) return;
+    const id = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(id);
+  }, [confirming]);
 
   async function handleClose() {
     if (!confirming) { setConfirming(true); return; }
     try {
       await closeM.mutate();
-      toast.success('Consultation closed');
+      toast.success(t('matters.close.success'));
       onDone();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.first : 'Failed to close');
+      toast.error(err instanceof ApiError ? err.first : t('matters.close.failed'));
     } finally {
       setConfirming(false);
     }
@@ -213,10 +222,9 @@ function CloseConsultationButton({ consultationId, onDone }: { consultationId: s
       variant={confirming ? 'destructive' : 'outline'}
       disabled={closeM.loading}
       onClick={handleClose}
-      onBlur={() => setConfirming(false)}
     >
       {closeM.loading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-      {confirming ? 'Confirm close?' : 'Close consultation'}
+      {confirming ? t('matters.close.confirm') : t('matters.close.cta')}
     </Button>
   );
 }

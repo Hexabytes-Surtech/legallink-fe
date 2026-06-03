@@ -9,11 +9,17 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:4000';
 export type ChatStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 export type ChatMessage = WsMessage & { optimistic?: boolean };
 
+export interface ClosedBy {
+  by: 'citizen' | 'advocate';
+  byName: string;
+}
+
 export interface UseChatSocket {
   status: ChatStatus;
   messages: ChatMessage[];
   peerTyping: boolean;
   closed: boolean;
+  closedBy: ClosedBy | null;
   error: string | null;
   send: (text: string) => void;
   setTyping: (isTyping: boolean) => void;
@@ -37,6 +43,7 @@ export function useChatSocket(
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [peerTyping, setPeerTyping] = React.useState(false);
   const [closed, setClosed] = React.useState(false);
+  const [closedBy, setClosedBy] = React.useState<ClosedBy | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const socketRef = React.useRef<Socket | null>(null);
@@ -77,6 +84,19 @@ export function useChatSocket(
         }
         return [...prev, { ...msg }];
       });
+    });
+
+    socket.on('consultation_closed', (p: ClosedBy) => {
+      setClosed(true);
+      setClosedBy(p);
+    });
+
+    socket.on('message_deleted', (data: { messageId: string }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.messageId === data.messageId ? { ...m, deleted: true, attachmentUrl: null } : m,
+        ),
+      );
     });
 
     socket.on('typing', (data: { senderId?: string; isTyping: boolean }) => {
@@ -149,5 +169,5 @@ export function useChatSocket(
     socket.emit('typing', { isTyping });
   }, [closed]);
 
-  return { status, messages, peerTyping, closed, error, send, setTyping };
+  return { status, messages, peerTyping, closed, closedBy, error, send, setTyping };
 }

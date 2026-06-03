@@ -55,37 +55,34 @@ export default function CitizenDashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:py-8">
-      {/* ── Hero band ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-soft sm:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-aurora-blobs opacity-70 dark:opacity-90" />
-        <div className="relative flex flex-wrap items-start justify-between gap-5">
+      {/* ── Hero band (compact) ───────────────────────────────────── */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
+        <div className="pointer-events-none absolute inset-0 bg-aurora-blobs opacity-50 dark:opacity-75" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-              <Sparkles className="size-3.5 text-gold-bright" /> LegalLink
-            </span>
-            <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
               {t('dashboard.welcome')}{firstName ? <span className="text-gradient-gold">, {firstName}</span> : ''}
             </h1>
-            <p className="mt-1.5 max-w-md text-sm text-muted-foreground sm:text-base">{t('dashboard.subtitle')}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t('dashboard.subtitle')}</p>
           </div>
-          <Button asChild size="lg" className="bg-brand-gradient text-white shadow-lift transition-transform hover:scale-[1.02]">
-            <Link href="/intake"><Plus className="size-4" /> {t('citizen.nav.ask')}</Link>
+          <Button asChild className="bg-brand-gradient text-white shadow-lift transition-transform hover:scale-[1.02]">
+            <Link href="/ask"><Sparkles className="size-4" /> {t('citizen.nav.askAi')}</Link>
           </Button>
         </div>
 
         {/* Inline stats */}
-        <div className="relative mt-7 grid grid-cols-3 gap-3 sm:max-w-2xl">
+        <div className="relative mt-4 grid grid-cols-3 gap-2.5 sm:max-w-xl">
           {stats.map((s) => {
             const Icon = s.icon;
             return (
-              <div key={s.key} className="rounded-2xl border border-border/70 bg-background/50 px-4 py-3 backdrop-blur transition-colors hover:border-gold/40">
+              <div key={s.key} className="rounded-xl border border-border/70 bg-background/50 px-3 py-2 backdrop-blur transition-colors hover:border-gold/40">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Icon className={`size-4 ${s.tint}`} />
-                  <span className="text-[10px] font-medium uppercase leading-tight tracking-wide sm:text-[11px]">{t(s.key)}</span>
+                  <Icon className={`size-3.5 ${s.tint}`} />
+                  <span className="text-[10px] font-medium uppercase leading-tight tracking-wide">{t(s.key)}</span>
                 </div>
                 {loading
-                  ? <Skeleton className="mt-1.5 h-8 w-10" />
-                  : <p className="mt-1 font-display text-2xl font-semibold leading-none sm:text-3xl">{s.value}</p>}
+                  ? <Skeleton className="mt-1 h-7 w-8" />
+                  : <p className="mt-0.5 font-display text-xl font-semibold leading-none sm:text-2xl">{s.value}</p>}
               </div>
             );
           })}
@@ -115,7 +112,7 @@ export default function CitizenDashboardPage() {
                 <EmptyState
                   icon={FolderOpen}
                   title={t('matters.empty')}
-                  action={<Button asChild><Link href="/intake"><Plus className="size-4" /> {t('matters.empty.cta')}</Link></Button>}
+                  action={<Button asChild><Link href="/ask"><Plus className="size-4" /> {t('matters.empty.cta')}</Link></Button>}
                 />
               </div>
             ) : (
@@ -172,18 +169,7 @@ export default function CitizenDashboardPage() {
                   {stats[0].value > 0 ? `${stats[0].value} ${t('dashboard.stat.active').toLowerCase()}` : t('chat.noConversations')}
                 </p>
               </div>
-              <Button asChild size="icon" variant="ghost"><Link href="/chat" aria-label={t('citizen.nav.messages')}><ArrowRight className="size-4" /></Link></Button>
-            </CardContent>
-          </Card>
-
-          {/* Ask a question */}
-          <Card className="bg-card/60">
-            <CardContent className="py-5">
-              <h3 className="font-semibold">{t('dashboard.action.ask.title')}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{t('dashboard.action.ask.desc')}</p>
-              <Button asChild size="sm" variant="outline" className="mt-3 w-full">
-                <Link href="/intake"><Plus className="size-4" /> {t('matters.empty.cta')}</Link>
-              </Button>
+              <Button asChild size="icon" variant="ghost"><Link href="/messages" aria-label={t('citizen.nav.messages')}><ArrowRight className="size-4" /></Link></Button>
             </CardContent>
           </Card>
         </aside>

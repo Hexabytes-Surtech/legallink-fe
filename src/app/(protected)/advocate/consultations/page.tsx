@@ -120,7 +120,7 @@ function ConsultationCard({
             </>
           )}
           {c.status === 'accepted' && (
-            <Button asChild size="sm"><Link href={`/chat/${c.id}`}><MessageSquare className="size-4" /> {tr('adv.consult.openChat')}</Link></Button>
+            <Button asChild size="sm"><Link href={`/advocate/messages/${c.id}`}><MessageSquare className="size-4" /> {tr('adv.consult.openChat')}</Link></Button>
           )}
         </div>
       </CardContent>

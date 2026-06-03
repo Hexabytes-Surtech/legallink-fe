@@ -1,5 +1,6 @@
 /** Shared option lists for advocate forms. */
-export const PRACTICE_AREAS = ['Criminal', 'Civil', 'Family', 'Labour', 'Tenancy', 'Traffic', 'Consumer'];
+// Canonical practice-area buckets live in one place now (lib/practice-areas).
+export { PRACTICE_AREAS } from './practice-areas';
 
 export const WB_DISTRICTS = [
   'Kolkata', 'Howrah', 'Hooghly', 'North 24 Parganas', 'South 24 Parganas',

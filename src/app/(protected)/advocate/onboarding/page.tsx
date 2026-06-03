@@ -72,7 +72,7 @@ export default function OnboardingPage() {
     if (!file) return;
     setUploading(true);
     try {
-      const fd = new FormData(); fd.append('file', file);
+      const fd = new FormData(); fd.append('document', file);
       await api.upload('/advocate/documents', fd);
       toast.success(t('adv.docs.uploaded'));
       docsQ.refetch();
