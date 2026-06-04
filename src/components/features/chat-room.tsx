@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Send, ShieldAlert, Lock, Loader2, Clock, Paperclip, MoreVertical, XCircle, Star } from 'lucide-react';
+import { Send, ShieldAlert, Lock, Loader2, Clock, Paperclip, MoreVertical, XCircle, Star, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useChatSocket } from '@/hooks';
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { ChatAttachment } from '@/components/features/chat-attachment';
 import { FeedbackDialog } from '@/components/features/feedback-dialog';
+import { ReportDialog } from '@/components/features/report-dialog';
 import { cn } from '@/lib/utils';
 import type { ConsultationListItem, AdvocateConsultation } from '@/types';
 
@@ -52,10 +53,10 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   const meta = React.useMemo(() => {
     if (isAdvocate) {
       const c = (advocateQ.data ?? []).find((x) => x.id === consultationId);
-      return c ? { name: c.citizen_name || 'Citizen', status: c.status, hasFeedback: false } : null;
+      return c ? { name: c.citizen_name || 'Citizen', status: c.status, hasFeedback: false, reported: !!c.reported } : null;
     }
     const c = (citizenQ.data ?? []).find((x) => x.consultationId === consultationId);
-    return c ? { name: c.advocateName || 'Advocate', status: c.status, hasFeedback: !!c.hasFeedback } : null;
+    return c ? { name: c.advocateName || 'Advocate', status: c.status, hasFeedback: !!c.hasFeedback, reported: false } : null;
   }, [isAdvocate, advocateQ.data, citizenQ.data, consultationId]);
 
   const chat = useChatSocket(consultationId, accessToken, { id: user?.userId, type: selfType });
@@ -123,7 +124,8 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   const refetchMeta = isAdvocate ? advocateQ.refetch : citizenQ.refetch;
   const [confirmEnd, setConfirmEnd] = React.useState(false);
   const [ending, setEnding] = React.useState(false);
-  const canEnd = meta?.status === 'accepted' && !closed;
+  // Only the citizen may end a consultation. The advocate's recourse is to report.
+  const canEnd = isCitizen && meta?.status === 'accepted' && !closed;
 
   async function endChat() {
     setEnding(true);
@@ -256,6 +258,21 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
                 consultationId={consultationId}
                 onDone={refetchMeta}
                 trigger={<Button className="w-full"><Star className="size-4" /> {t('chat.rate')}</Button>}
+              />
+            ))}
+            {isAdvocate && (meta?.reported ? (
+              <p className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                <Flag className="size-4 text-destructive" /> {t('chat.reported')}
+              </p>
+            ) : (
+              <ReportDialog
+                consultationId={consultationId}
+                onDone={refetchMeta}
+                trigger={
+                  <Button variant="outline" className="w-full text-destructive hover:text-destructive">
+                    <Flag className="size-4" /> {t('chat.report')}
+                  </Button>
+                }
               />
             ))}
           </div>

@@ -72,7 +72,11 @@ export function MessagesShell({
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold">{c.name}</span>
-                      {c.unread > 0 && <Badge variant="default" className="h-5 px-1.5">{c.unread}</Badge>}
+                      {c.unread > 0 && (
+                        <Badge variant="default" className="h-5 min-w-5 justify-center rounded-full px-1.5 tabular-nums">
+                          {c.unread > 99 ? '99+' : c.unread}
+                        </Badge>
+                      )}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">{c.snippet}</span>
                   </span>

@@ -253,7 +253,8 @@ export interface ConsultationListItem {
   status: ConsultationStatus;
   matter_id: string;
   advocate_id: string;
-  unread: number;
+  unread: boolean;        // has new activity (incl. acceptance)
+  unreadCount: number;    // unseen advocate messages — drives the numeric badge
   query: string;
   language: Language;
   advocateName: string;
@@ -298,6 +299,8 @@ export interface AdvocateConsultation {
   classification: Classification | null;
   citizen_user_id: string;
   citizen_name?: string;
+  reported?: boolean;             // advocate has filed a report on this consultation
+  unreadCount?: number;          // unseen citizen messages — drives the numeric badge
   brief_json?: AiResponse | null; // only on the detail endpoint
   // legacy / optional
   accepted_at?: string;
@@ -405,6 +408,31 @@ export interface FlaggedMessage {
   moderationStatus: ModerationStatus;
   moderationFlags: ModerationFlag[];
   createdAt: string;
+}
+
+// Advocate → admin: report against a citizen on a closed consultation.
+export type ReportReason =
+  | 'abusive'
+  | 'spam'
+  | 'ended_unfairly'
+  | 'off_platform_contact'
+  | 'other';
+
+export type ReportStatus = 'open' | 'reviewed' | 'dismissed';
+
+export interface CitizenReport {
+  reportId: string;
+  consultationId: string;
+  reason: ReportReason;
+  note: string | null;
+  status: ReportStatus;
+  adminNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  advocateName: string;
+  citizenName: string;
+  citizenEmail: string | null;
+  matterSnippet: string | null;
 }
 
 // ---------------------------------------------------------------------------

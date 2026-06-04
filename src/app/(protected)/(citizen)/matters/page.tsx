@@ -135,7 +135,7 @@ function RowList({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   {badge ? <Badge variant={badge.variant}>{tr(badge.key)}</Badge> : <Badge variant="muted">{tr('matters.consult.none')}</Badge>}
-                  {!!consult?.unread && consult.unread > 0 && <Badge variant="default">{consult.unread} {tr('matters.unreadMsgs')}</Badge>}
+                  {!!consult?.unreadCount && consult.unreadCount > 0 && <Badge variant="default">{consult.unreadCount} {tr('matters.unreadMsgs')}</Badge>}
                   {consult?.advocateName && <span className="text-xs text-muted-foreground">· {consult.advocateName}</span>}
                 </div>
                 <p className={`mt-2 line-clamp-2 text-sm leading-relaxed text-foreground/90 ${matter.language === 'bn' ? 'font-bn' : ''}`}>

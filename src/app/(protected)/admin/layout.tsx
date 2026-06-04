@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, BadgeCheck, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, BadgeCheck, ShieldAlert, ShieldCheck, Flag } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConsoleShell, type ConsoleNavItem } from '@/components/shared/console-shell';
@@ -14,6 +14,7 @@ const NAV: ConsoleNavItem[] = [
   { href: '/admin', icon: LayoutDashboard, key: 'adm.nav.overview', exact: true },
   { href: '/admin/advocates', icon: BadgeCheck, key: 'adm.nav.verification' },
   { href: '/admin/messages', icon: ShieldAlert, key: 'adm.nav.moderation' },
+  { href: '/admin/reports', icon: Flag, key: 'adm.nav.reports' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
