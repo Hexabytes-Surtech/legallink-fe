@@ -7,7 +7,8 @@ import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useChatSocket } from '@/hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AvatarFallback } from '@/components/ui/avatar';
+import { ViewableAvatar } from '@/components/shared/viewable-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +17,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChatAttachment } from '@/components/features/chat-attachment';
 import { FeedbackDialog } from '@/components/features/feedback-dialog';
 import { ReportDialog } from '@/components/features/report-dialog';
@@ -53,10 +55,10 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   const meta = React.useMemo(() => {
     if (isAdvocate) {
       const c = (advocateQ.data ?? []).find((x) => x.id === consultationId);
-      return c ? { name: c.citizen_name || 'Citizen', status: c.status, hasFeedback: false, reported: !!c.reported } : null;
+      return c ? { name: c.citizen_name || 'Citizen', status: c.status, hasFeedback: false, reported: !!c.reported, avatarUrl: c.citizen_avatar_url ?? null } : null;
     }
     const c = (citizenQ.data ?? []).find((x) => x.consultationId === consultationId);
-    return c ? { name: c.advocateName || 'Advocate', status: c.status, hasFeedback: !!c.hasFeedback, reported: false } : null;
+    return c ? { name: c.advocateName || 'Advocate', status: c.status, hasFeedback: !!c.hasFeedback, reported: false, avatarUrl: c.advocateAvatarUrl ?? null } : null;
   }, [isAdvocate, advocateQ.data, citizenQ.data, consultationId]);
 
   const chat = useChatSocket(consultationId, accessToken, { id: user?.userId, type: selfType });
@@ -152,7 +154,12 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
     <div className="flex h-full flex-col">
       {/* Header */}
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <Avatar className="size-10 ring-1 ring-border"><AvatarFallback>{initials(meta?.name ?? '')}</AvatarFallback></Avatar>
+        <ViewableAvatar
+          src={meta?.avatarUrl}
+          name={meta?.name ?? ''}
+          className="size-10 ring-1 ring-border"
+          fallback={<AvatarFallback>{initials(meta?.name ?? '')}</AvatarFallback>}
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{meta?.name ?? t('chat.title')}</p>
           <span className="flex items-center gap-1.5 text-xs">
@@ -180,7 +187,9 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
 
       {/* Messages */}
       <div ref={scrollRef} className="bg-dots flex-1 space-y-1 overflow-y-auto px-4 py-4">
-        {chat.messages.length === 0 ? (
+        {!chat.historyLoaded ? (
+          <ChatSkeleton />
+        ) : chat.messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-sm text-muted-foreground">{t('chat.empty')}</p>
           </div>
@@ -329,6 +338,25 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** Loading placeholder for the chat thread (covers Neon cold-start latency). */
+function ChatSkeleton() {
+  // alternating incoming/outgoing bubble rows
+  const rows = [
+    { mine: false, w: 'w-44' }, { mine: false, w: 'w-32' },
+    { mine: true, w: 'w-52' }, { mine: false, w: 'w-40' },
+    { mine: true, w: 'w-36' }, { mine: false, w: 'w-48' },
+  ];
+  return (
+    <div className="space-y-3">
+      {rows.map((r, i) => (
+        <div key={i} className={cn('flex', r.mine ? 'justify-end' : 'justify-start')}>
+          <Skeleton className={cn('h-9 rounded-2xl', r.w, r.mine ? 'rounded-br-sm' : 'rounded-bl-sm')} />
+        </div>
+      ))}
     </div>
   );
 }

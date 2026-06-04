@@ -25,8 +25,8 @@
   --popover: #ffffff;
   --popover-foreground: #16182b;
 
-  /* Primary = electric indigo (consistent CTA across themes) */
-  --primary: #5b4fe0;
+  /* Primary = LegalLink cerulean (matches the logo; consistent CTA across themes) */
+  --primary: #0a78c0;
   --primary-foreground: #ffffff;
 
   /* Secondary = low-emphasis indigo-gray surface */
@@ -45,11 +45,11 @@
 
   --border: #e3e4f0;
   --input: #d9dbec;
-  --ring: #5b4fe0;
+  --ring: #0a78c0;
 
-  /* Brand + semantic extras (theme-aware). `gold` = indigo, `gold-bright` = violet. */
-  --gold: #5b4fe0;
-  --gold-bright: #8b5cf6;
+  /* Brand + semantic extras (theme-aware). `gold` = logo cerulean, `gold-bright` = sky blue. */
+  --gold: #0a78c0;
+  --gold-bright: #1aa3e8;
   --navy: #16182b;
   --wine: #db2777;
   --cream: #f6f7fb;
@@ -71,10 +71,10 @@
   /* Glass + glow (used by Aceternity-style components) */
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(22, 24, 43, 0.08);
-  --glow: rgba(91, 79, 224, 0.26);
+  --glow: rgba(10, 120, 192, 0.28);
   --hero-grid: rgba(22, 24, 43, 0.05);
 
-  --shadow-color: 30 27 75;
+  --shadow-color: 8 40 90;
 }
 
 .dark {
@@ -87,7 +87,7 @@
   --popover: #12152a;
   --popover-foreground: #e7e9f5;
 
-  --primary: #6d5ef6;
+  --primary: #2393d8;
   --primary-foreground: #ffffff;
 
   --secondary: #1a1e36;
@@ -104,10 +104,10 @@
 
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: #6d5ef6;
+  --ring: #2393d8;
 
-  --gold: #6d5ef6;
-  --gold-bright: #a78bfa;
+  --gold: #2393d8;
+  --gold-bright: #5cc6ff;
   --navy: #0b0d1a;
   --wine: #f472b6;
   --cream: #e7e9f5;
@@ -117,7 +117,7 @@
 
   --glass-bg: rgba(255, 255, 255, 0.045);
   --glass-border: rgba(255, 255, 255, 0.1);
-  --glow: rgba(109, 94, 246, 0.42);
+  --glow: rgba(35, 147, 216, 0.45);
   --hero-grid: rgba(255, 255, 255, 0.045);
 
   --shadow-color: 0 0 0;

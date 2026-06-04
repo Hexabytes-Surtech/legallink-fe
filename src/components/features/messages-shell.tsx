@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ export interface MessageConvo {
   snippet: string;
   status: string;
   unread: number;
+  avatarUrl?: string | null;
 }
 
 function initials(name: string) {
@@ -65,7 +66,10 @@ export function MessagesShell({
                   )}
                 >
                   <span className="relative shrink-0">
-                    <Avatar className="size-9"><AvatarFallback className="text-xs">{initials(c.name)}</AvatarFallback></Avatar>
+                    <Avatar className="size-9">
+                      {c.avatarUrl && <AvatarImage src={c.avatarUrl} alt={c.name} />}
+                      <AvatarFallback className="text-xs">{initials(c.name)}</AvatarFallback>
+                    </Avatar>
                     <span className={cn('absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-card',
                       c.status === 'accepted' ? 'bg-success' : 'bg-muted-foreground')} />
                   </span>

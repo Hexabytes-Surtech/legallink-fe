@@ -24,11 +24,13 @@ function initials(name: string) {
  * role's profile link and sign-out. Collapses to just the avatar in icon mode.
  */
 export function SidebarAccount({
-  avatarUrl, name, secondary, profileHref, profileLabel, editable = true,
+  avatarUrl, name, secondary, nameAdornment, profileHref, profileLabel, editable = true,
 }: {
   avatarUrl?: string | null;
   name: string;
   secondary?: React.ReactNode;
+  /** Rendered inline, right after the name (e.g. a verification symbol). */
+  nameAdornment?: React.ReactNode;
   profileHref: string;
   profileLabel: string;
   editable?: boolean;
@@ -50,7 +52,10 @@ export function SidebarAccount({
       {editable && <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={onChange} />}
 
       <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <p className="truncate text-sm font-semibold">{name}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-sm font-semibold">{name}</p>
+          {nameAdornment && <span className="shrink-0">{nameAdornment}</span>}
+        </div>
         {secondary}
       </div>
 

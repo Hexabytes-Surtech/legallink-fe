@@ -46,6 +46,7 @@ export default function AdvocateMessagesLayout({ children }: { children: React.R
           snippet: c.query_text,
           status: c.status,
           unread: c.unreadCount ?? 0,
+          avatarUrl: c.citizen_avatar_url,
         })),
     [q.data],
   );

@@ -69,7 +69,7 @@ export function Navbar() {
       )}
     >
       <nav className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo />
+        <Logo markSize="size-11" textClassName="text-2xl" />
 
         {/* Desktop links */}
         <div className="hidden items-center gap-1 md:flex">

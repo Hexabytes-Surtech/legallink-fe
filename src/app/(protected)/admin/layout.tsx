@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConsoleShell, type ConsoleNavItem } from '@/components/shared/console-shell';
 import { SidebarAccount } from '@/components/shared/sidebar-account';
-import { Spinner } from '@/components/shared/spinner';
+import { AppSkeleton } from '@/components/shared/app-skeleton';
 
 const NAV: ConsoleNavItem[] = [
   { href: '/admin', icon: LayoutDashboard, key: 'adm.nav.overview', exact: true },
@@ -27,7 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [user, router]);
 
   if (user && user.role !== 'admin') {
-    return <div className="flex flex-1 items-center justify-center"><Spinner /></div>;
+    return <AppSkeleton />;
   }
 
   const name = user?.name || (user?.email?.split('@')[0] ?? 'Admin');

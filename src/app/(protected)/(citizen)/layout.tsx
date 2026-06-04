@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConsoleShell, type ConsoleNavItem } from '@/components/shared/console-shell';
 import { SidebarAccount } from '@/components/shared/sidebar-account';
-import { Spinner } from '@/components/shared/spinner';
+import { AppSkeleton } from '@/components/shared/app-skeleton';
 import type { UserProfile } from '@/types';
 
 const NAV: ConsoleNavItem[] = [
@@ -49,7 +49,7 @@ export default function CitizenLayout({ children }: { children: React.ReactNode 
   }, [me, user?.name, user?.avatar_url, updateUser]);
 
   if (user && !isCitizen) {
-    return <div className="flex flex-1 items-center justify-center"><Spinner /></div>;
+    return <AppSkeleton />;
   }
 
   const name = user?.name || me?.name || (user?.email?.split('@')[0] ?? 'You');

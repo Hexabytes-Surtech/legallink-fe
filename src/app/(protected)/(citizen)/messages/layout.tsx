@@ -47,6 +47,7 @@ export default function CitizenMessagesLayout({ children }: { children: React.Re
           snippet: c.matterBrief || c.query,
           status: c.status,
           unread: c.unreadCount ?? 0,
+          avatarUrl: c.advocateAvatarUrl,
         })),
     [q.data],
   );

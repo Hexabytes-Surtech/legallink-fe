@@ -20,6 +20,5 @@ export const ROUTES = {
     CONSULTATIONS: '/advocate/consultations',
     CONSULTATION_DETAIL: (id: string) => `/advocate/consultations/${id}`,
     PROFILE: '/advocate/profile',
-    DOCUMENTS: '/advocate/documents',
   },
 } as const;

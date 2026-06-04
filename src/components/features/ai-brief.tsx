@@ -171,13 +171,13 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
       )}
 
       {/* Citations */}
-      {ai.citations.length > 0 && (
+      {!!ai.citations?.length && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{tr('matter.citations', isBn)}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-2">
-            {ai.citations.map((cit, i) => <CitationChip key={i} citation={cit} />)}
+            {ai.citations!.map((cit, i) => <CitationChip key={i} citation={cit} />)}
           </CardContent>
         </Card>
       )}

@@ -15,8 +15,33 @@ export const LANGUAGE_OPTIONS = [
 ];
 
 export const COMMON_COURTS = [
-  'Calcutta High Court', 'District Court', 'Sessions Court',
-  'Civil Court', 'Consumer Forum', 'Family Court', 'Labour Court',
+
+  // District Level
+  'District Court',
+  'Sessions Court',
+  'City Civil Court',        // Kolkata-specific
+
+  // Subordinate Civil
+  'Civil Judge Court',
+  'Small Causes Court',      // Kolkata-specific
+
+  // Subordinate Criminal
+  'Magistrate Court',
+
+  // Specialized
+  'Family Court',
+  'Labour Court',
+  'Fast Track Court',
+
+  // Consumer
+  'Consumer Disputes Redressal Commission',
+
+  // Tribunals
+  'Administrative Tribunal',
+  'Motor Accident Claims Tribunal',
 ];
 
 export const BIO_MAX = 300;
+
+/** This platform serves West Bengal only — the State Bar Council is fixed for everyone. */
+export const STATE_BAR_COUNCIL = 'West Bengal';

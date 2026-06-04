@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Spinner } from '@/components/shared/spinner';
+import { AppSkeleton } from '@/components/shared/app-skeleton';
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -17,11 +17,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }, [isLoading, isAuthenticated, router, pathname]);
 
   if (isLoading || !isAuthenticated) {
-    return (
-      <div className="flex min-h-svh items-center justify-center gap-3 text-muted-foreground">
-        <Spinner />
-      </div>
-    );
+    return <AppSkeleton />;
   }
 
   // Each console (citizen / advocate / admin) renders its own full-height shadcn

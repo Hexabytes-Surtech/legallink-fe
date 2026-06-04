@@ -258,6 +258,7 @@ export interface ConsultationListItem {
   query: string;
   language: Language;
   advocateName: string;
+  advocateAvatarUrl?: string | null;
   advocateVerificationStatus: VerificationStatus;
   matterBrief: string | null;
   created_at: string;
@@ -299,6 +300,7 @@ export interface AdvocateConsultation {
   classification: Classification | null;
   citizen_user_id: string;
   citizen_name?: string;
+  citizen_avatar_url?: string | null;
   reported?: boolean;             // advocate has filed a report on this consultation
   unreadCount?: number;          // unseen citizen messages — drives the numeric badge
   brief_json?: AiResponse | null; // only on the detail endpoint
@@ -317,6 +319,7 @@ export interface FeedbackReview {
   rating: number;
   comment: string | null;
   citizenName: string;
+  citizenAvatarUrl?: string | null;
   createdAt: string;
   isVisible?: boolean;
 }
