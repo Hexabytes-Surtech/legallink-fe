@@ -218,7 +218,6 @@ export const translations = {
     'auth.haveAccount': 'Already have an account?',
     'auth.needAccount': 'New to LegalLink?',
     'auth.lockout': 'Too many attempts. Please try again later.',
-    'auth.devHint': 'Dev mode: use code 000000',
 
     // Settings
     'settings.title': 'Settings',
@@ -781,7 +780,6 @@ export const translations = {
     'auth.haveAccount': 'ইতিমধ্যে অ্যাকাউন্ট আছে?',
     'auth.needAccount': 'লিগ্যাললিংকে নতুন?',
     'auth.lockout': 'অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পরে আবার চেষ্টা করুন।',
-    'auth.devHint': 'ডেভ মোড: কোড 000000 ব্যবহার করুন',
 
     // Settings
     'settings.title': 'সেটিংস',

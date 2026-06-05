@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 export type AuthMode = 'login' | 'signup' | 'advocate-signup';
 
 const RESEND_COOLDOWN = 30;
-const isDev = process.env.NODE_ENV !== 'production';
 
 export function AuthOtpForm({
   mode,
@@ -152,7 +151,6 @@ export function AuthOtpForm({
               disabled={busy}
               hasError={!!error}
             />
-            {isDev && <p className="text-center text-xs text-muted-foreground">{t('auth.devHint')}</p>}
           </div>
           {error && <p className="text-sm font-medium text-destructive">{error}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy || otp.length !== 6}>
