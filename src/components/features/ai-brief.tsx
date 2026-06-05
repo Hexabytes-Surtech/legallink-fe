@@ -4,7 +4,6 @@ import { AlertTriangle, BookOpen, ListChecks, Footprints, Sparkles, MapPin, Scal
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CitationChip } from './citation-chip';
 import { displayPracticeArea } from '@/lib/practice-areas';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -74,7 +73,14 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
   const nextSteps = toList(ai.nextSteps);
   const hasEn = !!ai.responseEnglish;
   const hasBn = !!ai.responseBengali;
-  const defaultTab = isBn && hasBn ? 'bn' : hasEn ? 'en' : 'bn';
+
+  // No in-card language switcher: render in the app's active language, falling
+  // back to whichever translation the backend produced.
+  let analysis: string | null;
+  let analysisBn: boolean;
+  if (isBn && hasBn) { analysis = ai.responseBengali; analysisBn = true; }
+  else if (hasEn) { analysis = ai.responseEnglish; analysisBn = false; }
+  else { analysis = ai.responseBengali; analysisBn = hasBn; }
 
   return (
     <div className="space-y-5">
@@ -82,8 +88,9 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
       {c && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Scale className="size-4 text-gold" /> {tr('matter.classification', isBn)}
+            <CardTitle className="flex items-center gap-2.5 text-base">
+              <span className="grid size-8 place-items-center rounded-lg bg-gold/12 text-gold"><Scale className="size-4" /></span>
+              {tr('matter.classification', isBn)}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
@@ -109,27 +116,18 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
         </Card>
       )}
 
-      {/* Plain-language analysis with EN/BN tabs */}
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="size-4 text-gold" /> {tr('matter.aiResponse', isBn)}
+      {/* Plain-language analysis — the centrepiece, in the active language */}
+      <Card className="relative overflow-hidden border-gold/30 shadow-soft">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-brand-gradient" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2.5 text-base">
+            <span className="grid size-8 place-items-center rounded-lg bg-gold/15 text-gold"><Sparkles className="size-4" /></span>
+            {tr('matter.aiResponse', isBn)}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {hasEn || hasBn ? (
-            <Tabs defaultValue={defaultTab}>
-              <TabsList>
-                <TabsTrigger value="en" disabled={!hasEn}>{tr('matter.tab.english', isBn)}</TabsTrigger>
-                <TabsTrigger value="bn" disabled={!hasBn} className="font-bn">{tr('matter.tab.bengali', isBn)}</TabsTrigger>
-              </TabsList>
-              <TabsContent value="en">
-                <Prose text={ai.responseEnglish} />
-              </TabsContent>
-              <TabsContent value="bn">
-                <Prose text={ai.responseBengali} className="font-bn" />
-              </TabsContent>
-            </Tabs>
+          {analysis ? (
+            <Prose text={analysis} className={analysisBn ? 'font-bn' : ''} />
           ) : (
             <p className="text-sm text-muted-foreground">{tr('brief.failed', isBn)}</p>
           )}
@@ -202,9 +200,12 @@ function Prose({ text, className }: { text: string | null; className?: string })
 
 function StepCard({ icon, title, items }: { icon: React.ReactNode; title: string; items: string[] }) {
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">{icon} {title}</CardTitle>
+        <CardTitle className="flex items-center gap-2.5 text-base">
+          <span className="grid size-8 place-items-center rounded-lg bg-gold/12 text-gold">{icon}</span>
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <ol className="space-y-2.5">

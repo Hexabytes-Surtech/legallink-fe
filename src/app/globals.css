@@ -318,6 +318,19 @@
   .animate-shimmer { animation: var(--animate-shimmer); }
   .animate-float { animation: var(--animate-float); }
   .animate-pulse-glow { animation: var(--animate-pulse-glow); }
+  /* Smoothly rotating conic angle — used for glowing gradient borders/halos */
+  .animate-border-rotate { animation: border-rotate 7s linear infinite; }
+  /* Gentle vertical nudge — directional "look here" cue */
+  .animate-nudge { animation: nudge 1.6s ease-in-out infinite; }
+  /* Typewriter caret blink */
+  .animate-caret { animation: caret-blink 1.05s steps(1) infinite; }
+}
+
+/* Animatable angle so a conic-gradient can spin without moving its box */
+@property --ll-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
 
 /* ============================================================================
@@ -339,6 +352,17 @@
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.6; }
   50%      { opacity: 1; }
+}
+@keyframes border-rotate {
+  to { --ll-angle: 360deg; }
+}
+@keyframes nudge {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(6px); }
+}
+@keyframes caret-blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

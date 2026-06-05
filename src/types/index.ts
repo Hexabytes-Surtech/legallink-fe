@@ -489,3 +489,57 @@ export interface OnboardingPayload {
   practice_areas?: string[];
   availability_mode?: 'online' | 'in_person' | 'both';
 }
+
+// ── AI conversational assistant (multi-turn triage chat) ──────────────────────
+export type AiChatPhase = 'triage' | 'gathering' | 'ready' | 'closed';
+
+/** One assistant turn — returned by POST /ai/conversation and /:id/message. */
+export interface AiTurn {
+  conversationId: string;
+  phase: AiChatPhase;
+  isLegalProblem: boolean | null;
+  assistantReply: string;
+  followUpQuestion: string;
+  suggestedSteps: string[];
+  readyToConnect: boolean;
+  matterId: string | null;
+}
+
+/** A stored message as returned by GET /ai/conversation/:id (for resume). */
+export interface AiStoredMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/** Full conversation snapshot — GET /ai/conversation/:id. */
+export interface AiConversationDetail {
+  conversationId: string;
+  language: Language;
+  phase: AiChatPhase;
+  isLegalProblem: boolean | null;
+  readyToConnect: boolean;
+  matterId: string | null;
+  messages: AiStoredMessage[];
+}
+
+/** Result of POST /ai/conversation/:id/connect. */
+export interface AiConnectResult {
+  conversationId: string;
+  matterId: string;
+  alreadyConnected: boolean;
+}
+
+/** A row in the citizen's chat-history list — GET /ai/conversation. */
+export interface AiConversationSummary {
+  conversationId: string;
+  title: string;          // derived from the citizen's first message
+  phase: AiChatPhase;
+  isLegalProblem: boolean | null;
+  matterId: string | null;
+  readyToConnect: boolean;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}

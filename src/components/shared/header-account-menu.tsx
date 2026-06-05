@@ -2,11 +2,13 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { LogOut, Eye, Camera, UserRound } from 'lucide-react';
+import { toast } from 'sonner';
+import { LogOut, Eye, Camera, UserRound, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAvatarUpload } from '@/hooks/useAvatarUpload';
 import { useAvatarViewer } from '@/contexts/AvatarViewerContext';
+import { usePwaInstall } from '@/contexts/PwaInstallContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -35,6 +37,13 @@ export function HeaderAccountMenu() {
   const { t } = useLanguage();
   const { open } = useAvatarViewer();
   const { openPicker, inputRef, onChange, cropper } = useAvatarUpload();
+  const { installable, isIOS, promptInstall } = usePwaInstall();
+
+  async function handleInstall() {
+    if (isIOS) { toast.info(t('pwa.iosHint')); return; }
+    await promptInstall();
+  }
+
   if (!user) return null;
 
   const name = user.name || user.email?.split('@')[0] || 'Account';
@@ -73,6 +82,14 @@ export function HeaderAccountMenu() {
           <DropdownMenuItem onClick={openPicker}>
             <Camera /> {hasPhoto ? t('avatar.update') : t('avatar.upload')}
           </DropdownMenuItem>
+          {installable && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleInstall}>
+                <Download /> {t('nav.installApp')}
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive">
             <LogOut /> {t('nav.signOut')}

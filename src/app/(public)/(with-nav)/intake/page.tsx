@@ -3,7 +3,7 @@
 import { ShieldCheck, Sparkles, Scale } from 'lucide-react';
 import { AuroraBackground } from '@/components/aceternity/aurora-background';
 import { Reveal } from '@/components/shared/reveal';
-import { MatterIntake } from '@/components/features/matter-intake';
+import { AiIntakeLauncher } from '@/components/features/ai-intake-launcher';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const ASSURANCES = [
@@ -30,7 +30,7 @@ export default function IntakePage() {
 
         <Reveal delay={0.12}>
           <div className="mt-10">
-            <MatterIntake variant="block" autoFocus />
+            <AiIntakeLauncher autoFocus />
           </div>
         </Reveal>
 

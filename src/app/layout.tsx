@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
 import { Toaster } from '@/components/ui/sonner';
+import { Pwa } from '@/components/shared/pwa';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.in';
 
@@ -38,6 +39,22 @@ export const metadata: Metadata = {
     canonical: SITE_URL,
     languages: { 'en-IN': `${SITE_URL}`, 'bn-IN': `${SITE_URL}?lang=bn` },
   },
+  applicationName: 'LegalLink',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'LegalLink',
+  },
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0a78c0' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0d1a' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -56,6 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           {children}
           <Toaster />
+          <Pwa />
         </Providers>
       </body>
     </html>

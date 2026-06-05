@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline · LegalLink</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #f6f7fb; color: #16182b; padding: 24px; text-align: center;
+    }
+    @media (prefers-color-scheme: dark) { body { background: #0b0d1a; color: #e7e9f5; } }
+    .card { max-width: 360px; }
+    img { width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 10px 30px rgba(10,120,192,.25); }
+    h1 { font-size: 1.4rem; margin: 20px 0 8px; }
+    p { margin: 0 0 20px; opacity: .7; line-height: 1.5; font-size: .95rem; }
+    button {
+      border: 0; cursor: pointer; padding: 12px 22px; border-radius: 12px;
+      background: #0a78c0; color: #fff; font-weight: 600; font-size: .95rem;
+    }
+    button:active { transform: scale(.97); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/icon-192.png" alt="LegalLink" />
+    <h1>You're offline</h1>
+    <p>LegalLink needs an internet connection for legal analysis and advocate matching. Please reconnect and try again.</p>
+    <button onclick="location.reload()">Retry</button>
+  </div>
+</body>
+</html>

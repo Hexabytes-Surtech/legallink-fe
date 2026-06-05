@@ -9,6 +9,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { OtpInput } from '@/components/features/otp-input';
 import type { VerifyOtpResponse } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +46,17 @@ export function AuthOtpForm({
     const id = setInterval(() => setCooldown((c) => c - 1), 1000);
     return () => clearInterval(id);
   }, [cooldown]);
+
+  // Auto-verify the moment all six digits are in — no need to hunt for the button.
+  const autoSubmitted = React.useRef(false);
+  React.useEffect(() => {
+    if (otp.length < 6) { autoSubmitted.current = false; return; }
+    if (step === 'otp' && !busy && !autoSubmitted.current) {
+      autoSubmitted.current = true;
+      void verify();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp, step, busy]);
 
   const role = mode === 'advocate-signup' ? 'advocate' : 'citizen';
 
@@ -103,7 +115,7 @@ export function AuthOtpForm({
   return (
     <div className={cn('w-full', className)}>
       {step === 'email' ? (
-        <form onSubmit={sendCode} className="space-y-4">
+        <form key="email" onSubmit={sendCode} className="space-y-4 duration-300 animate-in fade-in slide-in-from-bottom-2">
           <div className="space-y-2">
             <Label htmlFor="auth-email">{t('auth.step1.label')}</Label>
             <div className="relative">
@@ -127,24 +139,20 @@ export function AuthOtpForm({
           </Button>
         </form>
       ) : (
-        <form onSubmit={verify} className="space-y-4">
+        <form key="otp" onSubmit={verify} className="space-y-4 duration-300 animate-in fade-in slide-in-from-right-3">
           <button type="button" onClick={() => { setStep('email'); setOtp(''); setError(''); }} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="size-4" /> {email}
           </button>
-          <div className="space-y-2">
-            <Label htmlFor="auth-otp">{t('auth.step2.title')}</Label>
-            <Input
-              id="auth-otp"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              autoFocus
-              maxLength={6}
-              placeholder={t('auth.step2.placeholder')}
+          <div className="space-y-3">
+            <Label htmlFor="auth-otp" className="block text-center">{t('auth.step2.title')}</Label>
+            <OtpInput
               value={otp}
-              onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); if (error) setError(''); }}
-              className="text-center font-mono text-2xl tracking-[0.5em]"
+              onChange={(next) => { setOtp(next); if (error) setError(''); }}
+              autoFocus
+              disabled={busy}
+              hasError={!!error}
             />
-            {isDev && <p className="text-xs text-muted-foreground">{t('auth.devHint')}</p>}
+            {isDev && <p className="text-center text-xs text-muted-foreground">{t('auth.devHint')}</p>}
           </div>
           {error && <p className="text-sm font-medium text-destructive">{error}</p>}
           <Button type="submit" className="w-full" size="lg" disabled={busy || otp.length !== 6}>
