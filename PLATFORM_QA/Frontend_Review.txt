@@ -1,0 +1,99 @@
+Code Review — PR #3 fix(qa): platform QA — 14 bugs fixed (max effort)
+
+Scope: 17 src/ files (the PLATFORM_QA/ docs/screenshots/Lighthouse output is out of scope). Base dev/parthib/UI ← qa/platform-health. Method: 7 finder angles + 1 gap sweep, each candidate verified against the actual code (I read the API client, useApi, AuthContext, both layouts, and every touched render site).
+
+The PR is mostly sound — the skipAuth removals are safe for anonymous users (AuthContext keeps token+user atomic and refreshes-or-clears on boot), pathname is correctly in scope, and the new optional type fields default safely. The findings below are the real residue.
+
+Findings (ranked)
+
+1 🔴 Incomplete BUG-014 fix — onboarding doc upload still 400s. onboarding/page.tsx:75 still does fd.append('file', file) against /advocate/documents, the exact endpoint+field the PR says the backend rejects (FileInterceptor wants 'document'). Only documents/page.tsx was patched; this is the primary upload site (onboarding step 4). Advocates can't submit verification docs → can't get verified. Fix: change 'file' → 'document' here too.
+
+2 🟠 Citizen sidebar "Find Advocates" link ejects the user from the console. Moving /advocates to (public)/(with-nav) (BUG-003) means the citizen NAV item at (citizen)/layout.tsx:28 now lands on a page rendered under the public Navbar/Footer layout, without the SidebarProvider. A logged-in citizen loses their sidebar and has no in-console way back; pathname.startsWith('/advocates') active-state never applies. Fix: add an authenticated alias route (e.g. keep a thin (citizen)/advocates that renders the shared page) or render the directory inside the citizen shell for logged-in users.
+
+3 🟡 i18n regression — hardcoded English in the new close/feedback UI. matters/page.tsx adds 5 user-facing strings outside t()/tr(): "Feedback submitted" (168), "Consultation closed" (201), "Failed to close" (204), "Confirm close?" / "Close consultation" (219). In a bilingual app whose PR title claims i18n cleanup, Bengali users see English. Fix: add matters.* keys (EN+BN) and use tr(...).
+
+4 🟡 AI-brief shows duplicate/un-normalised classification badges. ai-brief.tsx:90-91: the matterType badge renders displayPracticeArea(c.matterType) (normalised) but the dedup guard compares raw (c.primaryDomain !== c.matterType) and renders c.primaryDomain raw. With matterType='criminal_matter', primaryDomain='Criminal' you get two badges both reading "Criminal"; with a raw primaryDomain slug you get a snake_case badge beside a normalised one. Fix: normalise both sides and compare the normalised values.
+
+5 🟡 displayPracticeArea crashes on a null/empty array element. advocate-card.tsx:28 calls raw.toLowerCase() with no guard. The &&-guarded matterType callers are safe, but element-map callers — advocate-card.tsx:73 practiceAreas.slice(0,4).map(...) and advocates/[id]/page.tsx:87 p.practice_areas?.map((a)=>displayPracticeArea(a)) — guard the array, not its elements. A [null]/[''] payload (the same malformed-data class the new ?? [] defends against) throws and blanks the page. Note the ?? [] defense was added only in AdvocateCard — the detail page and other consumers remain exposed. Fix: guard inside displayPracticeArea (if (!raw) return '') — one place covers all callers.
+
+6 🟡 [pathname] refetch is both too eager and too weak. (citizen)/layout.tsx:46 and advocate/layout.tsx:46 now refetch /user/me / /advocate/me on every in-app navigation — a full profile GET per sidebar click — yet still miss the in-place case (editing avatar/profile without navigating leaves the sidebar stale). Fix: invalidate on the profile/avatar/onboarding mutation (or push the updated profile into AuthContext) instead of keying off pathname; the two layouts otherwise duplicate this hack.
+
+7 🟡 Three independent sources of truth for practice areas. PA_DISPLAY (slug→label, advocate-card.tsx:17), the directory filter list (advocates/page.tsx:19, Title-Case), and lib/constants.ts PRACTICE_AREAS must agree but aren't linked. The filter sends Title-Case ('Civil') while records hold slugs (corporate_law); display normalisation can't fix a query/stored mismatch, so a card shown as "Civil" may not appear under the "Civil" filter, and adding an area means editing 3 files in lockstep. Fix: one canonical slug→bucket map at the data boundary; derive the filter list from it.
+
+8 🟡 skipAuth handled two opposite ways for the same concept. Matter pages dropped skipAuth (send token if present), while advocates/[id]/page.tsx:34-36 (×3) and advocates/page.tsx:37 keep skipAuth:true for structurally identical optional-auth public endpoints. If the backend later personalises advocate results for logged-in users, those pages silently send the anonymous view. Fix: a single auth:'optional' request flag applied uniformly.
+
+9 🟢 Bespoke confirm pattern, fragile + inconsistent. CloseConsultationButton (matters/page.tsx:193) uses a two-click confirm whose onBlur={() => setConfirming(false)} cancels on any focus shift (tooltip, scroll-tap, SR navigation), while cancelBooking in the same file (line 57) uses window.confirm and decline uses a Dialog. Three idioms, no shared AlertDialog. Fix: one shared confirm primitive built on the existing Dialog.
+
+10 🟢 Dead code / misplaced util in displayPracticeArea. advocate-card.tsx:28: the middle lookup ?? PA_DISPLAY[raw] is unreachable (every key is lowercase and the first lookup already lowercases raw). Also this pure formatter lives in a UI component yet is imported by 4 other modules — it belongs in lib/. Fix: drop the dead branch; move to lib/format (or lib/practice-areas).
+
+11 🟢 Narrow stale-token regression on public matter pages (plausible, low). matter/[id]/page.tsx:28,30: removing skipAuth means a logged-in-but-stale-token visitor hits the 401→refresh-retry path on a public read; if refresh fails the matter/advocates panels error where skipAuth:true always rendered the public view. Largely mitigated (AuthContext clears tokens on failed refresh at boot) — only a narrow async-boot window survives. Fix (defensive): on a 401 whose refresh fails, retry once without the bearer token, or scope it as auth:'optional' per #8.
+
+---
+[
+  {
+    "file": "src/app/(protected)/advocate/onboarding/page.tsx",
+    "line": 75,
+    "summary": "Incomplete BUG-014 fix: onboarding still uploads to /advocate/documents with FormData field 'file', which the backend FileInterceptor rejects with HTTP 400; only documents/page.tsx was patched to 'document'.",
+    "failure_scenario": "Advocate at onboarding step 4 selects a verification PDF -> onUpload does `fd.append('file', file)` -> api.upload('/advocate/documents', fd) -> backend returns 400 'Unexpected field - file', toast shows error, no document stored, advocate cannot complete verification. This is the primary doc-upload site and was missed by the QA fix."
+  },
+  {
+    "file": "src/app/(protected)/(citizen)/layout.tsx",
+    "line": 28,
+    "summary": "Citizen sidebar 'Find Advocates' (href '/advocates') now resolves to a page moved into (public)/(with-nav), so it renders under the public Navbar/Footer layout instead of the citizen SidebarProvider — ejecting logged-in citizens from their console.",
+    "failure_scenario": "Logged-in citizen on /dashboard clicks 'Find Advocates' -> Next renders src/app/(public)/(with-nav)/advocates/page.tsx (PublicNavLayout), the sidebar disappears, pathname.startsWith('/advocates') active-state never applies, and there is no in-console way back. IA/navigation regression introduced by the BUG-003 route move."
+  },
+  {
+    "file": "src/app/(protected)/(citizen)/matters/page.tsx",
+    "line": 219,
+    "summary": "New close/feedback UI hardcodes English strings (lines 168 'Feedback submitted', 201 'Consultation closed', 204 'Failed to close', 219 'Confirm close?'/'Close consultation'), bypassing the t()/tr() i18n system in a bilingual app.",
+    "failure_scenario": "User with language='bn' opens /matters with an accepted/closed consultation; the close button, its success/error toasts, and the 'Feedback submitted' label render in English while every adjacent label is Bengali. No matters.close*/feedbackSubmitted keys exist in i18n/config.ts."
+  },
+  {
+    "file": "src/components/features/ai-brief.tsx",
+    "line": 91,
+    "summary": "matterType badge is normalised via displayPracticeArea() but the primaryDomain dedup guard compares RAW values (c.primaryDomain !== c.matterType) and renders primaryDomain RAW, producing duplicate-looking or un-normalised badges.",
+    "failure_scenario": "Classification matterType='criminal_matter', primaryDomain='Criminal': guard is true (raw 'Criminal' !== 'criminal_matter'), so the muted primaryDomain badge renders 'Criminal' next to the normalised 'Criminal' default badge -> two identical badges. If primaryDomain is itself a slug it renders un-normalised next to a normalised matterType."
+  },
+  {
+    "file": "src/components/features/advocate-card.tsx",
+    "line": 28,
+    "summary": "displayPracticeArea calls raw.toLowerCase() with no null guard; element-map callers (advocate-card practiceAreas.map, advocates/[id]:87 practice_areas?.map) guard the array but not its elements, so a null/empty element crashes the render. The new defensive `?? []` was added only in AdvocateCard, leaving the detail page and other consumers exposed.",
+    "failure_scenario": "GET /advocates/:id returns practice_areas containing a null/'' element (same malformed-data class the PR's `?? []` defends against). advocates/[id]/page.tsx:87 maps it into displayPracticeArea -> null.toLowerCase() throws TypeError -> the advocate profile route hits the error boundary."
+  },
+  {
+    "file": "src/app/(protected)/(citizen)/layout.tsx",
+    "line": 46,
+    "summary": "Changing the useQuery dep from [] to [pathname] (here and advocate/layout.tsx:46) refetches /user/me & /advocate/me on every in-app navigation — wasted I/O per click — while still missing same-route profile/avatar edits, so it is both too eager and too weak.",
+    "failure_scenario": "Each sidebar/link navigation fires a full profile GET (N pages = N round-trips, with a name/avatar flash while loading), yet editing the avatar without navigating leaves the sidebar stale. The real need is invalidation after a profile/onboarding mutation; the two layouts must also keep this refetch hack in sync by hand."
+  },
+  {
+    "file": "src/components/features/advocate-card.tsx",
+    "line": 17,
+    "summary": "Practice areas now have three independent sources of truth that must agree but aren't linked: PA_DISPLAY (slug->label), the directory filter list (advocates/page.tsx:19, Title-Case), and lib/constants.ts PRACTICE_AREAS. The filter queries by Title-Case while records store slugs.",lib/constants.ts PRACTICE_AREAS. The filter queries by Title-Case while records store slugs.",
+    "failure_scenario": "A legacy advocate whose practice_areas hold 'corporate_law' renders a 'Civil' badge via PA_DISPLAY, but filtering practiceArea='Civil' relies on the backend independently mapping corporate_law->Civil; if the maps drift the advocate is shown as Civil yet filtered out of Civil results. Adding/renaming an area requires editing 3 files in lockstep."
+  },
+  {
+    "file": "src/app/(public)/(with-nav)/advocates/[id]/page.tsx",
+    "line": 34,
+    "summary": "skipAuth is handled two opposite ways for the same optional-auth public-endpoint concept: matter/[id] & matter-intake dropped skipAuth (send token if present) while advocates/[id] (x3) and advocates/page.tsx keep skipAuth:true. No single notion of optional auth.",
+    "failure_scenario": "If the backend later personalises advocate directory/availability results for logged-in users (favourites, eligibility, hidden unverified), these pages silently send no token and show the anonymous view, while matter pages opt in — each new public page coin-flips which convention it copies. Maintenance/inconsistency cost."
+  },
+  {
+    "file": "src/app/(protected)/(citizen)/matters/page.tsx",
+    "line": 193,
+    "summary": "CloseConsultationButton implements a bespoke two-click confirm whose onBlur reset cancels on any focus shift, while cancelBooking in the same file uses window.confirm and decline uses a Dialog — three confirm idioms with no shared AlertDialog primitive.",
+    "failure_scenario": "Any focus change after the first click (tooltip, scroll-tap on mobile, screen-reader navigation) fires onBlur -> setConfirming(false), silently reverting the pending confirm; meanwhile the adjacent cancel action uses a native window.confirm with different look/keyboard behaviour. Future destructive actions have no canonical pattern to reuse."
+  },
+  {
+    "file": "src/components/features/advocate-card.tsx",
+    "line": 28,
+    "summary": "The middle lookup `?? PA_DISPLAY[raw]` is dead code (all 27 keys are lowercase and the first term already lowercases raw, so it can only hit when the first term already did), and displayPracticeArea — a pure formatter — lives in a UI component yet is imported by 4 other modules.",
+    "failure_scenario": "No runtime cost, but the dead branch misleads maintainers into thinking a case-sensitive path is supported (any future uppercase-keyed entry would be silently unreachable), and consumers must couple to advocate-card to use the formatter. Belongs in lib/."
+  },
+  {
+    "file": "src/app/(public)/(with-nav)/matter/[id]/page.tsx",
+    "line": 28,
+    "summary": "Removing skipAuth on the public GET /matter/:id and /matter/:id/advocates reads can convert a previously-successful anonymous read into an error for a visitor with a stale (expired-but-not-yet-cleared) access token, via the new 401 refresh-and-retry path. Largely mitigated by AuthContext clearing tokens on failed refresh at boot.",
+    "failure_scenario": "User with an expired ll_access_token opens a shared /matter/<id> link during the async restoreSession boot window; coreFetch attaches the stale Bearer, backend 401s, refresh fails (no valid session), original 401 surfaces, and the page/advocates panel renders the error/empty state instead of the public content skipAuth:true used to guarantee. Narrow window -> low confidence."
+  }
+]
