@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { AvatarViewerProvider } from '@/contexts/AvatarViewerContext';
 import { PwaInstallProvider } from '@/contexts/PwaInstallContext';
+import { CallProvider } from '@/contexts/CallContext';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -12,7 +13,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <LanguageProvider>
         <AuthProvider>
           <AvatarViewerProvider>
-            <PwaInstallProvider>{children}</PwaInstallProvider>
+            <PwaInstallProvider>
+              <CallProvider>{children}</CallProvider>
+            </PwaInstallProvider>
           </AvatarViewerProvider>
         </AuthProvider>
       </LanguageProvider>
