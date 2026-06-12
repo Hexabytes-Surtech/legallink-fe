@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Send, ShieldAlert, Lock, Loader2, Clock, Paperclip, MoreVertical, XCircle, Star, Flag } from 'lucide-react';
+import { Send, ShieldAlert, Lock, Loader2, Clock, Paperclip, MoreVertical, XCircle, Star, Flag, Phone, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useChatSocket } from '@/hooks';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCall } from '@/contexts/CallContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AvatarFallback } from '@/components/ui/avatar';
 import { ViewableAvatar } from '@/components/shared/viewable-avatar';
@@ -62,7 +63,9 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   }, [isAdvocate, advocateQ.data, citizenQ.data, consultationId]);
 
   const chat = useChatSocket(consultationId, accessToken, { id: user?.userId, type: selfType });
+  const call = useCall();
   const closed = chat.closed || meta?.status === 'closed';
+  const canCall = meta?.status === 'accepted' && !closed;
 
   const [draft, setDraft] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -169,6 +172,30 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
             {closed && <Badge variant="muted"><Lock className="size-3" /> {t('matters.consult.closed')}</Badge>}
           </span>
         </div>
+        {canCall && (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9"
+              aria-label="Voice call"
+              disabled={!call.canCall || call.phase !== 'idle'}
+              onClick={() => call.startCall(consultationId, meta?.name ?? 'User', 'voice', meta?.avatarUrl)}
+            >
+              <Phone className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9"
+              aria-label="Video call"
+              disabled={!call.canCall || call.phase !== 'idle'}
+              onClick={() => call.startCall(consultationId, meta?.name ?? 'User', 'video', meta?.avatarUrl)}
+            >
+              <Video className="size-4" />
+            </Button>
+          </div>
+        )}
         {canEnd && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
