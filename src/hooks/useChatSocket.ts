@@ -9,11 +9,19 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:4000';
 export type ChatStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 export type ChatMessage = WsMessage & { optimistic?: boolean };
 
+export interface ClosedBy {
+  by: 'citizen' | 'advocate';
+  byName: string;
+}
+
 export interface UseChatSocket {
   status: ChatStatus;
   messages: ChatMessage[];
+  /** True once the server's message history has arrived (used to gate skeleton vs empty state). */
+  historyLoaded: boolean;
   peerTyping: boolean;
   closed: boolean;
+  closedBy: ClosedBy | null;
   error: string | null;
   send: (text: string) => void;
   setTyping: (isTyping: boolean) => void;
@@ -35,8 +43,10 @@ export function useChatSocket(
   const tmpCounter = React.useRef(0);
   const [status, setStatus] = React.useState<ChatStatus>('connecting');
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [historyLoaded, setHistoryLoaded] = React.useState(false);
   const [peerTyping, setPeerTyping] = React.useState(false);
   const [closed, setClosed] = React.useState(false);
+  const [closedBy, setClosedBy] = React.useState<ClosedBy | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const socketRef = React.useRef<Socket | null>(null);
@@ -53,6 +63,7 @@ export function useChatSocket(
     });
     socketRef.current = socket;
     setStatus('connecting');
+    setHistoryLoaded(false);
 
     socket.on('connect', () => setStatus('connected'));
     socket.on('disconnect', () => setStatus('disconnected'));
@@ -60,6 +71,7 @@ export function useChatSocket(
 
     socket.on('history', (history: WsMessage[]) => {
       if (Array.isArray(history)) setMessages(history.map((m) => ({ ...m })));
+      setHistoryLoaded(true);
     });
 
     socket.on('message', (msg: WsMessage) => {
@@ -77,6 +89,19 @@ export function useChatSocket(
         }
         return [...prev, { ...msg }];
       });
+    });
+
+    socket.on('consultation_closed', (p: ClosedBy) => {
+      setClosed(true);
+      setClosedBy(p);
+    });
+
+    socket.on('message_deleted', (data: { messageId: string }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.messageId === data.messageId ? { ...m, deleted: true, attachmentUrl: null } : m,
+        ),
+      );
     });
 
     socket.on('typing', (data: { senderId?: string; isTyping: boolean }) => {
@@ -106,6 +131,7 @@ export function useChatSocket(
 
     socket.on('error', (e: { code?: string; message?: string }) => {
       setStatus('error');
+      setHistoryLoaded(true); // stop the loading skeleton; surface the error/empty state
       setError(e?.message || e?.code || 'Connection error');
     });
 
@@ -149,5 +175,5 @@ export function useChatSocket(
     socket.emit('typing', { isTyping });
   }, [closed]);
 
-  return { status, messages, peerTyping, closed, error, send, setTyping };
+  return { status, messages, historyLoaded, peerTyping, closed, closedBy, error, send, setTyping };
 }

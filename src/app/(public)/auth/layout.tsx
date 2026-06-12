@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <AuroraBackground className="min-h-screen">
       <div className="flex min-h-screen flex-col">
         <header className="flex items-center justify-between px-4 py-5 sm:px-6">
-          <Logo />
+          <Logo markSize="size-12" textClassName="text-2xl" />
           <div className="flex items-center gap-2">
             <LanguageToggle className="hidden sm:inline-flex" />
             <ThemeToggle />

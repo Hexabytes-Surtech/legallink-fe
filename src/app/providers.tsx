@@ -2,13 +2,22 @@
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { AvatarViewerProvider } from '@/contexts/AvatarViewerContext';
+import { PwaInstallProvider } from '@/contexts/PwaInstallContext';
+import { CallProvider } from '@/contexts/CallContext';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
       <LanguageProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <AvatarViewerProvider>
+            <PwaInstallProvider>
+              <CallProvider>{children}</CallProvider>
+            </PwaInstallProvider>
+          </AvatarViewerProvider>
+        </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
   );

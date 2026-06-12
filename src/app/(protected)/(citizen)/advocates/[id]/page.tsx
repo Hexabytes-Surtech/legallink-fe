@@ -3,11 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, MapPin, Languages as LangIcon, Building2, MessageSquareQuote, CalendarClock } from 'lucide-react';
+import { ArrowLeft, MapPin, Languages as LangIcon, Building2, MessageSquareQuote, CalendarClock, FileCheck2, FileText } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarFallback } from '@/components/ui/avatar';
+import { ViewableAvatar } from '@/components/shared/viewable-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,10 +17,13 @@ import { Separator } from '@/components/ui/separator';
 import { VerificationBadge } from '@/components/shared/verification-badge';
 import { RatingStars } from '@/components/features/rating-stars';
 import { ConnectDialog } from '@/components/features/connect-dialog';
+import { ViewDocumentButton } from '@/components/features/document-viewer';
+import { uniquePracticeAreaLabels } from '@/lib/practice-areas';
 import { EmptyState } from '@/components/shared/empty-state';
 import type { AdvocateCardData, AdvocateFeedback, AvailabilityDay } from '@/types';
 
-type Profile = AdvocateCardData & { courts?: string[] };
+interface PublicDoc { id: string; fileUrl: string; fileType: string }
+type Profile = AdvocateCardData & { courts?: string[]; documents?: PublicDoc[] };
 
 function initials(name: string) {
   return name?.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('') || 'A';
@@ -56,10 +60,12 @@ export default function AdvocateProfilePage() {
             {/* Header */}
             <Card>
               <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center">
-                <Avatar className="size-20 ring-1 ring-border">
-                  {p.avatar_url && <AvatarImage src={p.avatar_url} alt="" />}
-                  <AvatarFallback className="text-xl">{initials(p.name)}</AvatarFallback>
-                </Avatar>
+                <ViewableAvatar
+                  src={p.avatar_url}
+                  name={p.name}
+                  className="size-20 ring-1 ring-border"
+                  fallback={<AvatarFallback className="text-xl">{initials(p.name)}</AvatarFallback>}
+                />
                 <div className="min-w-0 flex-1">
                   <h1 className="font-display text-2xl font-semibold tracking-tight">{p.name}</h1>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -83,7 +89,7 @@ export default function AdvocateProfilePage() {
             <Card>
               <CardContent className="space-y-4 py-6">
                 <DetailRow label={t('matter.practiceAreas')}>
-                  {p.practice_areas?.map((a) => <Badge key={a} variant="gold">{a}</Badge>)}
+                  {uniquePracticeAreaLabels(p.practice_areas).map((label) => <Badge key={label} variant="gold">{label}</Badge>)}
                 </DetailRow>
                 <Separator />
                 <DetailRow label={t('matter.languages')} icon={<LangIcon className="size-4" />}>
@@ -104,6 +110,28 @@ export default function AdvocateProfilePage() {
               </CardContent>
             </Card>
 
+            {/* Verification documents — only present for verified advocates (gated server-side) */}
+            {p.documents && p.documents.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileCheck2 className="size-4 text-gold" /> {t('advocates.documents')}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {p.documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-gold/10 text-gold"><FileText className="size-4" /></span>
+                        <span className="truncate text-sm font-medium uppercase">{doc.fileType?.split('/').pop() || 'FILE'}</span>
+                      </span>
+                      <ViewDocumentButton url={doc.fileUrl} fileType={doc.fileType} name={t('advocates.documents')} protect />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Reviews */}
             <Card>
               <CardHeader>
@@ -117,8 +145,16 @@ export default function AdvocateProfilePage() {
                 ) : feedbackQ.data && feedbackQ.data.reviews.length > 0 ? (
                   feedbackQ.data.reviews.map((r) => (
                     <div key={r.id} className="rounded-lg border border-border bg-muted/30 p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold">{r.citizenName}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <ViewableAvatar
+                            src={r.citizenAvatarUrl}
+                            name={r.citizenName}
+                            className="size-8 shrink-0 ring-1 ring-border"
+                            fallback={<AvatarFallback className="text-xs">{initials(r.citizenName)}</AvatarFallback>}
+                          />
+                          <span className="truncate text-sm font-semibold">{r.citizenName}</span>
+                        </span>
                         <RatingStars rating={r.rating} />
                       </div>
                       {r.comment && <p className="mt-2 text-sm leading-relaxed text-foreground/85">{r.comment}</p>}
@@ -148,7 +184,7 @@ export default function AdvocateProfilePage() {
                 ) : (
                   <>
                     <p className="text-sm text-muted-foreground">{t('common.startMatter')}</p>
-                    <Button asChild size="lg" className="w-full"><Link href="/intake">{t('matters.empty.cta')}</Link></Button>
+                    <Button asChild size="lg" className="w-full"><Link href="/ask">{t('matters.empty.cta')}</Link></Button>
                   </>
                 )}
               </CardContent>

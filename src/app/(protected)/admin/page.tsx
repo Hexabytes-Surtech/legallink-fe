@@ -1,19 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { BadgeCheck, ShieldAlert, ArrowRight } from 'lucide-react';
+import { BadgeCheck, ShieldAlert, Flag, ArrowRight } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { PendingAdvocate, FlaggedMessage } from '@/types';
+import type { PendingAdvocate, FlaggedMessage, CitizenReport } from '@/types';
 
 export default function AdminOverviewPage() {
   const { t } = useLanguage();
   const pendingQ = useQuery<PendingAdvocate[]>(() => api.get('/admin/advocates/pending'), []);
   const flaggedQ = useQuery<FlaggedMessage[]>(() => api.get('/admin/messages/flagged'), []);
+  const reportsQ = useQuery<CitizenReport[]>(() => api.get('/admin/reports'), []);
 
   const cards = [
     {
@@ -24,6 +25,11 @@ export default function AdminOverviewPage() {
       icon: ShieldAlert, tone: 'text-warning', href: '/admin/messages',
       label: t('adm.overview.flagged'), q: flaggedQ, count: flaggedQ.data?.length ?? 0,
     },
+    {
+      icon: Flag, tone: 'text-destructive', href: '/admin/reports',
+      label: t('adm.overview.reports'), q: reportsQ,
+      count: (reportsQ.data ?? []).filter((r) => r.status === 'open').length,
+    },
   ];
 
   return (
@@ -31,7 +37,7 @@ export default function AdminOverviewPage() {
       <h1 className="font-display text-3xl font-semibold tracking-tight">{t('adm.title')}</h1>
       <p className="mt-1 text-muted-foreground">{t('adm.subtitle')}</p>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => {
           const Icon = c.icon;
           return (

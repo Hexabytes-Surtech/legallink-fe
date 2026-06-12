@@ -2,8 +2,10 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { LogOut, LayoutDashboard, Settings, Menu } from 'lucide-react';
+import { LogOut, LayoutDashboard, Settings, Menu, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAvatarViewer } from '@/contexts/AvatarViewerContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Logo } from './logo';
 import { ThemeToggle } from './theme-toggle';
 import { LanguageToggle } from './language-toggle';
@@ -45,6 +47,8 @@ function initials(name?: string | null, email?: string) {
 
 export function Navbar() {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { open: openAvatarViewer } = useAvatarViewer();
+  const { t } = useLanguage();
   const [scrolled, setScrolled] = React.useState(false);
 
   React.useEffect(() => {
@@ -65,7 +69,7 @@ export function Navbar() {
       )}
     >
       <nav className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo />
+        <Logo markSize="size-11" textClassName="text-2xl" />
 
         {/* Desktop links */}
         <div className="hidden items-center gap-1 md:flex">
@@ -92,10 +96,10 @@ export function Navbar() {
           ) : isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Account menu">
+                <button className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${initials(user.name, user.email)} — Account menu`}>
                   <Avatar className="ring-1 ring-border">
                     {user.avatar_url && <AvatarImage src={user.avatar_url} alt="" />}
-                    <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
+                    <AvatarFallback aria-hidden="true">{initials(user.name, user.email)}</AvatarFallback>
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
@@ -105,6 +109,11 @@ export function Navbar() {
                   <span className="block truncate text-xs font-normal capitalize text-muted-foreground">{user.role}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {user.avatar_url && (
+                  <DropdownMenuItem onClick={() => openAvatarViewer(user.avatar_url as string, user.name || user.email)}>
+                    <ImageIcon /> {t('avatar.view')}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Link href={home}><LayoutDashboard /> Dashboard</Link>
                 </DropdownMenuItem>

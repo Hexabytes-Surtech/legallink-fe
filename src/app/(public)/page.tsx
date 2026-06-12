@@ -11,7 +11,7 @@ import { AuroraBackground } from '@/components/aceternity/aurora-background';
 import { Spotlight } from '@/components/aceternity/spotlight';
 import { GlowCard } from '@/components/aceternity/glow-card';
 import { Reveal } from '@/components/shared/reveal';
-import { MatterIntake } from '@/components/features/matter-intake';
+import { AiIntakeLauncher } from '@/components/features/ai-intake-launcher';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -69,9 +69,9 @@ export default function LandingPage() {
         {/* ── Hero ───────────────────────────────────────────────── */}
         <AuroraBackground className="relative">
           <Spotlight className="-top-40 left-0 md:-top-20 md:left-60" />
-          <section className="mx-auto w-full max-w-5xl px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24">
+          <section className="mx-auto w-full max-w-5xl px-4 pb-20 pt-1 text-center sm:px-6 sm:pt-24">
             <Reveal>
-              <Badge variant="gold" className="mb-6">{t('landing.badge')}</Badge>
+              <Badge variant="gold" className="mb-2">{t('landing.badge')}</Badge>
             </Reveal>
             <Reveal delay={0.05}>
               <h1 className={`font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl ${isBn ? 'font-bn' : ''}`}>
@@ -81,14 +81,14 @@ export default function LandingPage() {
               </h1>
             </Reveal>
             <Reveal delay={0.1}>
-              <p className={`mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg ${isBn ? 'font-bn' : ''}`}>
+              <p className={`mx-auto mt-1 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg ${isBn ? 'font-bn' : ''}`}>
                 {t('landing.hero.subtitle')}
               </p>
             </Reveal>
 
             <Reveal delay={0.18}>
-              <div className="mx-auto mt-10 max-w-2xl text-left">
-                <MatterIntake variant="block" />
+              <div className="mx-auto mt-5 max-w-2xl text-left">
+                <AiIntakeLauncher />
               </div>
             </Reveal>
 

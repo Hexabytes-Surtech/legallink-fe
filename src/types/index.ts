@@ -203,6 +203,7 @@ export interface MatchedAdvocatesResponse {
 export interface AdvocateDashboard {
   advocateId: string;
   verificationStatus: VerificationStatus;
+  rejectionReason: string | null;
   profileCompleteness: number;
   consultationStats: {
     pending_count: string | number;
@@ -252,10 +253,12 @@ export interface ConsultationListItem {
   status: ConsultationStatus;
   matter_id: string;
   advocate_id: string;
-  unread: number;
+  unread: boolean;        // has new activity (incl. acceptance)
+  unreadCount: number;    // unseen advocate messages — drives the numeric badge
   query: string;
   language: Language;
   advocateName: string;
+  advocateAvatarUrl?: string | null;
   advocateVerificationStatus: VerificationStatus;
   matterBrief: string | null;
   created_at: string;
@@ -263,6 +266,7 @@ export interface ConsultationListItem {
   appointmentId: string | null;
   scheduledAt: string | null;
   appointmentStatus: AppointmentStatus | null;
+  hasFeedback?: boolean;
 }
 
 export interface ConsultationDetail {
@@ -296,6 +300,9 @@ export interface AdvocateConsultation {
   classification: Classification | null;
   citizen_user_id: string;
   citizen_name?: string;
+  citizen_avatar_url?: string | null;
+  reported?: boolean;             // advocate has filed a report on this consultation
+  unreadCount?: number;          // unseen citizen messages — drives the numeric badge
   brief_json?: AiResponse | null; // only on the detail endpoint
   // legacy / optional
   accepted_at?: string;
@@ -312,6 +319,7 @@ export interface FeedbackReview {
   rating: number;
   comment: string | null;
   citizenName: string;
+  citizenAvatarUrl?: string | null;
   createdAt: string;
   isVisible?: boolean;
 }
@@ -405,6 +413,31 @@ export interface FlaggedMessage {
   createdAt: string;
 }
 
+// Advocate → admin: report against a citizen on a closed consultation.
+export type ReportReason =
+  | 'abusive'
+  | 'spam'
+  | 'ended_unfairly'
+  | 'off_platform_contact'
+  | 'other';
+
+export type ReportStatus = 'open' | 'reviewed' | 'dismissed';
+
+export interface CitizenReport {
+  reportId: string;
+  consultationId: string;
+  reason: ReportReason;
+  note: string | null;
+  status: ReportStatus;
+  adminNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  advocateName: string;
+  citizenName: string;
+  citizenEmail: string | null;
+  matterSnippet: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket chat  (§6)
 // ---------------------------------------------------------------------------
@@ -415,6 +448,12 @@ export interface WsMessage {
   text: string;
   moderationStatus: ModerationStatus;
   timestamp: string;
+  // Optional file attachment (citizen → advocate). A pure attachment has empty text.
+  attachmentUrl?: string | null;
+  attachmentType?: 'image' | 'pdf';
+  attachmentName?: string;
+  attachmentSize?: number;
+  deleted?: boolean;
 }
 
 export interface WsWarning {
@@ -449,4 +488,58 @@ export interface OnboardingPayload {
   year_of_enrolment?: number;
   practice_areas?: string[];
   availability_mode?: 'online' | 'in_person' | 'both';
+}
+
+// ── AI conversational assistant (multi-turn triage chat) ──────────────────────
+export type AiChatPhase = 'triage' | 'gathering' | 'ready' | 'closed';
+
+/** One assistant turn — returned by POST /ai/conversation and /:id/message. */
+export interface AiTurn {
+  conversationId: string;
+  phase: AiChatPhase;
+  isLegalProblem: boolean | null;
+  assistantReply: string;
+  followUpQuestion: string;
+  suggestedSteps: string[];
+  readyToConnect: boolean;
+  matterId: string | null;
+}
+
+/** A stored message as returned by GET /ai/conversation/:id (for resume). */
+export interface AiStoredMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/** Full conversation snapshot — GET /ai/conversation/:id. */
+export interface AiConversationDetail {
+  conversationId: string;
+  language: Language;
+  phase: AiChatPhase;
+  isLegalProblem: boolean | null;
+  readyToConnect: boolean;
+  matterId: string | null;
+  messages: AiStoredMessage[];
+}
+
+/** Result of POST /ai/conversation/:id/connect. */
+export interface AiConnectResult {
+  conversationId: string;
+  matterId: string;
+  alreadyConnected: boolean;
+}
+
+/** A row in the citizen's chat-history list — GET /ai/conversation. */
+export interface AiConversationSummary {
+  conversationId: string;
+  title: string;          // derived from the citizen's first message
+  phase: AiChatPhase;
+  isLegalProblem: boolean | null;
+  matterId: string | null;
+  readyToConnect: boolean;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
 }

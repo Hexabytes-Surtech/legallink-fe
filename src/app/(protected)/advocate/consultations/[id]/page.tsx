@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AiBrief, AiBriefSkeleton } from '@/components/features/ai-brief';
+import { displayPracticeArea } from '@/components/features/advocate-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +54,7 @@ export default function AdvocateConsultationDetailPage() {
         <div className="mt-6 space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={c.status === 'accepted' ? 'success' : c.status === 'pending' ? 'warning' : 'muted'} className="capitalize">{c.status}</Badge>
-            {c.classification?.matterType && <Badge variant="gold">{c.classification.matterType}</Badge>}
+            {c.classification?.matterType && <Badge variant="gold">{displayPracticeArea(c.classification.matterType)}</Badge>}
             <span className="text-sm text-muted-foreground">{t('adv.consult.from')} {c.citizen_name || 'Citizen'}</span>
           </div>
 
@@ -77,7 +78,7 @@ export default function AdvocateConsultationDetailPage() {
               </>
             )}
             {c.status === 'accepted' && (
-              <Button asChild><Link href={`/chat/${id}`}><MessageSquare className="size-4" /> {t('adv.consult.openChat')}</Link></Button>
+              <Button asChild><Link href={`/advocate/messages/${id}`}><MessageSquare className="size-4" /> {t('adv.consult.openChat')}</Link></Button>
             )}
           </div>
 

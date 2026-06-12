@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { ChipToggle, TagInput } from '@/components/features/tag-input';
-import { PRACTICE_AREAS, WB_DISTRICTS, LANGUAGE_OPTIONS, COMMON_COURTS, BIO_MAX } from '@/lib/constants';
+import { PRACTICE_AREAS, WB_DISTRICTS, LANGUAGE_OPTIONS, COMMON_COURTS, BIO_MAX, STATE_BAR_COUNCIL } from '@/lib/constants';
 import type { AdvocateSelf, AdvocateDoc } from '@/types';
 
 const STEP_KEYS = ['adv.onb.s1', 'adv.onb.s2', 'adv.onb.s3', 'adv.onb.s4'] as const;
@@ -54,7 +54,6 @@ export default function OnboardingPage() {
     if (s === 1 && !f.name.trim()) return 'Enter your full name.';
     if (s === 1 && !/^(\+91|0)?[6-9]\d{9}$/.test(f.phone.replace(/\s|-/g, ''))) return 'Enter a valid 10-digit Indian mobile number.';
     if (s === 2 && !f.barEnrolmentNumber.trim()) return 'Enter your Bar enrolment number.';
-    if (s === 2 && !f.stateBar.trim()) return 'Enter your State Bar Council.';
     if (s === 2 && f.courts.length === 0) return 'Add at least one court.';
     if (s === 3 && f.practiceAreas.length === 0) return 'Select at least one practice area.';
     if (s === 3 && f.districts.length === 0) return 'Select at least one district.';
@@ -72,7 +71,7 @@ export default function OnboardingPage() {
     if (!file) return;
     setUploading(true);
     try {
-      const fd = new FormData(); fd.append('file', file);
+      const fd = new FormData(); fd.append('document', file);
       await api.upload('/advocate/documents', fd);
       toast.success(t('adv.docs.uploaded'));
       docsQ.refetch();
@@ -90,7 +89,7 @@ export default function OnboardingPage() {
     try {
       await api.put('/advocate/profile', {
         name: f.name.trim(), phone: f.phone.trim(), address: f.address.trim() || undefined,
-        barEnrolmentNumber: f.barEnrolmentNumber.trim(), stateBar: f.stateBar.trim(),
+        barEnrolmentNumber: f.barEnrolmentNumber.trim(), stateBar: STATE_BAR_COUNCIL,
         practiceAreas: f.practiceAreas, languages: f.languages, districts: f.districts, courts: f.courts,
         bio: f.bio.trim() || undefined,
       });
@@ -131,8 +130,11 @@ export default function OnboardingPage() {
           )}
           {step === 2 && (
             <>
-              <Field label={t('adv.profile.bar')}><Input value={f.barEnrolmentNumber} onChange={(e) => set('barEnrolmentNumber', e.target.value)} /></Field>
-              <Field label={t('adv.profile.stateBar')}><Input value={f.stateBar} onChange={(e) => set('stateBar', e.target.value)} placeholder="West Bengal" /></Field>
+              <Field label={t('adv.profile.bar')}><Input value={f.barEnrolmentNumber} onChange={(e) => set('barEnrolmentNumber', e.target.value)} placeholder="WB/0000/0000" /></Field>
+              <Field label={t('adv.profile.stateBar')}>
+                <Input value={STATE_BAR_COUNCIL} disabled readOnly className="cursor-not-allowed opacity-70" />
+                <p className="text-xs text-muted-foreground">{t('adv.profile.stateBarFixed')}</p>
+              </Field>
               <Field label={t('adv.profile.courts')}><TagInput value={f.courts} onChange={(v) => set('courts', v)} suggestions={COMMON_COURTS} placeholder={t('adv.profile.courts')} /></Field>
             </>
           )}
