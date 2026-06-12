@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   Sparkles, Send, Loader2, AlertTriangle, Scale, ShieldAlert, ArrowRight, RefreshCw,
-  FileText, CheckCircle2,
+  FileText, CheckCircle2, Mic,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api/client';
 import { errorMessage } from '@/hooks/useApi';
+import { useVoiceTranscription } from '@/hooks/useVoiceTranscription';
+import { VoiceRecorderBar } from './voice-recorder-bar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -100,10 +102,47 @@ export function AiChat({
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
+  // ── voice typing (record → Gemini transcription) ─────────────────────────
+  // Records the whole clip locally, then sends it once to Gemini (using the FE
+  // key), so nothing is lost to network lag the way the live Web Speech API
+  // did. The recogniser language follows the conversation (English / Bengali).
+  const voiceLang: 'en' | 'bn' = detectLanguage(input) === 'bn' || lang === 'bn' ? 'bn' : 'en';
+  const {
+    supported: micSupported,
+    status: voiceStatus,
+    seconds: voiceSeconds,
+    stream: voiceStream,
+    start: startDictation,
+    stop: stopDictation,
+    cancel: cancelDictation,
+  } = useVoiceTranscription({
+    lang: voiceLang,
+    onResult: (text) => {
+      // Append the transcribed words onto whatever was already typed.
+      setInput((prev) => prev + (prev && !/\s$/.test(prev) ? ' ' : '') + text);
+      if (hint) setHint('');
+    },
+    onError: (kind) => {
+      toast.error(
+        kind === 'not-allowed' ? t('ai.voice.denied')
+          : kind === 'insecure' ? t('ai.voice.insecure')
+            : kind === 'no-mic' ? t('ai.voice.nomic')
+              : kind === 'no-key' ? t('ai.voice.nokey')
+                : kind === 'network' ? t('ai.voice.network')
+                  : kind === 'rejected' ? t('ai.voice.rejected')
+                    : kind === 'empty' ? t('ai.voice.empty')
+                      : t('ai.voice.error'),
+      );
+    },
+  });
+
+  const voiceActive = voiceStatus !== 'idle';
+
   // ── send one turn ─────────────────────────────────────────────────────────
   const send = React.useCallback(async (raw?: string) => {
     const text = (raw ?? input).trim();
     if (busy) return;
+    cancelDictation(); // discard any in-progress recording
     if (!text) { setHint(t('ai.empty')); return; }
     if (text.length > 4000) { setHint(t('ask.long')); return; }
     setHint('');
@@ -205,6 +244,7 @@ export function AiChat({
   }, []);
 
   function resetView() {
+    cancelDictation();
     convIdRef.current = null;
     setMessages([]);
     setInput('');
@@ -228,6 +268,7 @@ export function AiChat({
   }, [conversationId, controlled]);
 
   function handleNewChat() {
+    cancelDictation();
     if (controlled) { onNewChat?.(); return; }
     try { localStorage.removeItem(LS_CONVERSATION); } catch { /* ignore */ }
     resetView();
@@ -331,29 +372,55 @@ export function AiChat({
               composerDisabled && 'pointer-events-none opacity-60',
             )}
           >
-            <textarea
-              ref={taRef}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); if (hint) setHint(''); }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
-              rows={1}
-              autoFocus={autoFocus}
-              disabled={busy || composerDisabled}
-              placeholder={composerDisabled ? t('ai.closed.ended.title') : t('ai.placeholder')}
-              className={cn(
-                'max-h-40 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed',
-                typedBn && 'font-bn',
-              )}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={busy || composerDisabled || !input.trim()}
-              className="shrink-0 transition-transform active:scale-95"
-              aria-label={t('ai.send')}
-            >
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-            </Button>
+            {voiceActive ? (
+              <VoiceRecorderBar
+                status={voiceStatus}
+                seconds={voiceSeconds}
+                stream={voiceStream}
+                onCancel={cancelDictation}
+                onStop={stopDictation}
+              />
+            ) : (
+              <>
+                <textarea
+                  ref={taRef}
+                  value={input}
+                  onChange={(e) => { setInput(e.target.value); if (hint) setHint(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }}
+                  rows={1}
+                  autoFocus={autoFocus}
+                  disabled={busy || composerDisabled}
+                  placeholder={composerDisabled ? t('ai.closed.ended.title') : t('ai.placeholder')}
+                  className={cn(
+                    'max-h-40 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed',
+                    typedBn && 'font-bn',
+                  )}
+                />
+                {micSupported && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={startDictation}
+                    disabled={busy || composerDisabled}
+                    aria-label={t('ai.voice.start')}
+                    title={t('ai.voice.start')}
+                    className="shrink-0 text-muted-foreground transition-transform active:scale-95"
+                  >
+                    <Mic className="size-4" />
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={busy || composerDisabled || !input.trim()}
+                  className="shrink-0 transition-transform active:scale-95"
+                  aria-label={t('ai.send')}
+                >
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                </Button>
+              </>
+            )}
           </form>
           <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
             {hint
