@@ -7,6 +7,8 @@ import { api } from '@/lib/api/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { IncomingCallModal } from '@/components/features/call/incoming-call-modal';
 import { CallOverlay } from '@/components/features/call/call-overlay';
+import { startRinging, stopRinging, unlockAudio } from '@/lib/call/ringtone';
+import { registerPushSubscription } from '@/lib/call/push';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:4000';
 
@@ -100,6 +102,48 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     myNameRef.current = user?.name?.trim() || 'Someone';
     myAvatarRef.current = user?.avatar_url ?? null;
   }, [user?.name, user?.avatar_url]);
+
+  // Foreground call ring. Browsers only allow audio from a user gesture, so unlock
+  // the AudioContext on the first pointer/key event after load.
+  React.useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  // Ring while a call is ringing in (callee) or out (caller); stop otherwise.
+  React.useEffect(() => {
+    if (phase === 'incoming') startRinging('incoming');
+    else if (phase === 'outgoing') startRinging('outgoing');
+    else stopRinging();
+    return () => stopRinging();
+  }, [phase]);
+
+  // Keep the push subscription fresh: if the user already granted notification
+  // permission, silently re-register this device's endpoint whenever authenticated.
+  React.useEffect(() => {
+    if (!accessToken) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    void registerPushSubscription();
+  }, [accessToken]);
+
+  // "Decline" tapped on a push notification reaches us (only when a window is open)
+  // as a service-worker message — reject that specific call server-side.
+  React.useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { type?: string; callId?: string } | null;
+      if (data?.type === 'call-decline' && data.callId) {
+        socketRef.current?.emit('call:reject', { callId: data.callId });
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
 
   React.useEffect(() => {
     if (!accessToken) return;
@@ -308,7 +352,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     actionsRef.current = { startCall, accept, reject, hangUp, toggleMute, toggleCamera };
 
     // ── Socket lifecycle ──────────────────────────────────────────────────────
-    socket.on('connect', () => setCanCall(true));
+    socket.on('connect', () => {
+      setCanCall(true);
+      // Ask the server to re-ring any call that arrived while we were away (e.g. the
+      // app was opened from a push notification, or the socket just reconnected).
+      socket.emit('call:pending', {});
+    });
     socket.on('disconnect', () => setCanCall(false));
     socket.on('connect_error', () => setCanCall(false));
 
