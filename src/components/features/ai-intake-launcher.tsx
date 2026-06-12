@@ -2,8 +2,11 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, Lock, Sparkles, Mic } from 'lucide-react';
+import { toast } from 'sonner';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useVoiceTranscription } from '@/hooks/useVoiceTranscription';
+import { VoiceRecorderBar } from './voice-recorder-bar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -46,9 +49,44 @@ export function AiIntakeLauncher({ className, autoFocus, onEngaged }: { classNam
   const typedBn = isBnText(query) || isBn;
   const ref = React.useRef<HTMLDivElement>(null);
 
+  // ── voice typing (record → Gemini transcription) ─────────────────────────
+  // Records the whole clip locally, then sends it once to Gemini (FE key) — no
+  // live streaming, so nothing is lost to network lag. The recogniser language
+  // follows the app's EN/বাংলা toggle, so Bengali speech comes back in Bengali.
+  const {
+    supported: micSupported,
+    status: voiceStatus,
+    seconds: voiceSeconds,
+    stream: voiceStream,
+    start: startDictation,
+    stop: stopDictation,
+    cancel: cancelDictation,
+  } = useVoiceTranscription({
+    lang: typedBn ? 'bn' : 'en',
+    onResult: (text) => {
+      // Append the transcribed words onto whatever was already typed.
+      setQuery((prev) => prev + (prev && !/\s$/.test(prev) ? ' ' : '') + text);
+      onEngaged?.();
+    },
+    onError: (kind) => {
+      toast.error(
+        kind === 'not-allowed' ? t('ai.voice.denied')
+          : kind === 'insecure' ? t('ai.voice.insecure')
+            : kind === 'no-mic' ? t('ai.voice.nomic')
+              : kind === 'no-key' ? t('ai.voice.nokey')
+                : kind === 'network' ? t('ai.voice.network')
+                  : kind === 'rejected' ? t('ai.voice.rejected')
+                    : kind === 'empty' ? t('ai.voice.empty')
+                      : t('ai.voice.error'),
+      );
+    },
+  });
+
+  const voiceActive = voiceStatus !== 'idle';
+
   // Typewriter placeholder: types out each example, pauses, deletes, next.
   // Pauses entirely while the user is engaged (focused or has typed something).
-  const showTypewriter = !focused && query === '';
+  const showTypewriter = !focused && query === '' && !voiceActive;
   React.useEffect(() => {
     if (!showTypewriter) return;
     const prompts = isBn ? PROMPTS_BN : PROMPTS_EN;
@@ -77,6 +115,7 @@ export function AiIntakeLauncher({ className, autoFocus, onEngaged }: { classNam
 
   function start(e?: React.FormEvent) {
     e?.preventDefault();
+    cancelDictation(); // discard any in-progress recording
     const trimmed = query.trim();
     if (!trimmed) return;
     try { sessionStorage.setItem(SS_SEED, trimmed); } catch { /* ignore */ }
@@ -141,37 +180,63 @@ export function AiIntakeLauncher({ className, autoFocus, onEngaged }: { classNam
             <Lock className="size-3" /> {t('landing.chat.pill')}
           </div>
           <div className="flex items-end gap-2">
-            <div className="relative flex-1">
-              <textarea
-                autoFocus={autoFocus}
-                value={query}
-                onFocus={() => { setFocused(true); onEngaged?.(); }}
-                onBlur={() => setFocused(false)}
-                onChange={(e) => { setQuery(e.target.value); onEngaged?.(); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); start(); } }}
-                rows={3}
-                className={cn(
-                  'max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-base leading-relaxed outline-none sm:text-lg',
-                  typedBn && 'font-bn',
-                )}
+            {voiceActive ? (
+              <VoiceRecorderBar
+                status={voiceStatus}
+                seconds={voiceSeconds}
+                stream={voiceStream}
+                onCancel={cancelDictation}
+                onStop={stopDictation}
+                className="h-12"
               />
-              {/* Living placeholder — typewriter cycling example questions. */}
-              {showTypewriter && (
-                <div
-                  aria-hidden
-                  className={cn(
-                    'pointer-events-none absolute inset-0 px-2 py-2 text-base leading-relaxed text-muted-foreground sm:text-lg',
-                    isBn && 'font-bn',
+            ) : (
+              <>
+                <div className="relative flex-1">
+                  <textarea
+                    autoFocus={autoFocus}
+                    value={query}
+                    onFocus={() => { setFocused(true); onEngaged?.(); }}
+                    onBlur={() => setFocused(false)}
+                    onChange={(e) => { setQuery(e.target.value); onEngaged?.(); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); start(); } }}
+                    rows={3}
+                    className={cn(
+                      'max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-base leading-relaxed outline-none sm:text-lg',
+                      typedBn && 'font-bn',
+                    )}
+                  />
+                  {/* Living placeholder — typewriter cycling example questions. */}
+                  {showTypewriter && (
+                    <div
+                      aria-hidden
+                      className={cn(
+                        'pointer-events-none absolute inset-0 px-2 py-2 text-base leading-relaxed text-muted-foreground sm:text-lg',
+                        isBn && 'font-bn',
+                      )}
+                    >
+                      {typed}
+                      <span className="ml-px inline-block w-px animate-caret bg-gold align-middle" style={{ height: '1.1em' }} />
+                    </div>
                   )}
-                >
-                  {typed}
-                  <span className="ml-px inline-block w-px animate-caret bg-gold align-middle" style={{ height: '1.1em' }} />
                 </div>
-              )}
-            </div>
-            <Button type="submit" disabled={!query.trim()} size="lg" className="shrink-0 glow-gold transition-transform active:scale-95">
-              <Sparkles className="size-4" />{t('landing.cta.primary')}<ArrowRight className="size-4" />
-            </Button>
+                {micSupported && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    onClick={startDictation}
+                    aria-label={t('ai.voice.start')}
+                    title={t('ai.voice.start')}
+                    className="h-12 w-12 shrink-0 text-muted-foreground transition-transform active:scale-95"
+                  >
+                    <Mic className="size-5" />
+                  </Button>
+                )}
+                <Button type="submit" disabled={!query.trim()} size="lg" className="shrink-0 glow-gold transition-transform active:scale-95">
+                  <Sparkles className="size-4" />{t('landing.cta.primary')}<ArrowRight className="size-4" />
+                </Button>
+              </>
+            )}
           </div>
           <div className="mt-1.5 px-2 text-[11px] text-muted-foreground">{t('landing.chat.hint')}</div>
         </div>

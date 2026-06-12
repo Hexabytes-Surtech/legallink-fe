@@ -14,7 +14,7 @@ function initials(name: string) {
     .join('');
 }
 
-/** Full-screen ring shown anywhere in the app when a 1:1 call comes in. */
+/** Ring shown anywhere in the app when a 1:1 call comes in. */
 export function IncomingCallModal() {
   const { phase, incoming, peerName, peerAvatar, accept, reject } = useCall();
 
@@ -23,15 +23,17 @@ export function IncomingCallModal() {
   const isVideo = incoming.mode === 'video';
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-      <div className="w-full max-w-sm rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-0 backdrop-blur-md sm:p-6">
+      <div className="relative flex h-full w-full flex-col items-center justify-center bg-card px-6 text-center sm:h-auto sm:max-h-[calc(100vh-4rem)] sm:max-w-sm sm:overflow-y-auto sm:rounded-3xl sm:border sm:border-border sm:px-8 sm:py-9 sm:shadow-2xl">
         {/* Caller avatar with a pulsing ring while it rings */}
-        <div className="relative mx-auto mb-5 size-24">
+        <div className="relative mx-auto mb-5 size-20">
           <span className="absolute inset-0 animate-ping rounded-full bg-gold/25" />
           <span className="absolute -inset-2 rounded-full border-2 border-gold/30" />
-          <Avatar className="relative size-24 ring-2 ring-gold/50">
+          <Avatar className="relative size-20 ring-2 ring-gold/50">
             {peerAvatar && <AvatarImage src={peerAvatar} alt={peerName} />}
-            <AvatarFallback className="text-2xl">{initials(peerName)}</AvatarFallback>
+            <AvatarFallback className="bg-gold/15 text-xl text-gold">
+              {initials(peerName)}
+            </AvatarFallback>
           </Avatar>
         </div>
 
@@ -41,7 +43,7 @@ export function IncomingCallModal() {
           Incoming {isVideo ? 'video' : 'voice'} call
         </p>
 
-        <div className="mt-8 flex items-center justify-center gap-12">
+        <div className="mt-8 flex items-center justify-center gap-10 sm:gap-12">
           <button
             type="button"
             onClick={reject}

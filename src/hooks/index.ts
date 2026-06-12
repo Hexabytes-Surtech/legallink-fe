@@ -6,3 +6,16 @@ export { useChatSocket } from './useChatSocket';
 export type { ChatStatus, ChatMessage, UseChatSocket } from './useChatSocket';
 export { useNotificationsSocket } from './useNotificationsSocket';
 export type { UnreadBump } from './useNotificationsSocket';
+export { useSpeechRecognition } from './useSpeechRecognition';
+export type {
+  UseSpeechRecognition,
+  UseSpeechRecognitionOptions,
+  SpeechErrorKind,
+} from './useSpeechRecognition';
+export { useVoiceTranscription } from './useVoiceTranscription';
+export type {
+  UseVoiceTranscription,
+  UseVoiceTranscriptionOptions,
+  VoiceStatus,
+  VoiceErrorKind,
+} from './useVoiceTranscription';
