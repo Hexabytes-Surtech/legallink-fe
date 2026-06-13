@@ -312,6 +312,77 @@ export interface AdvocateConsultation {
 }
 
 // ---------------------------------------------------------------------------
+// Case timeline + consultation closure
+// Advocate drives the stage + issues the closure summary; citizen views read-only.
+// ---------------------------------------------------------------------------
+export type TimelineStageKey =
+  | 'consultation_started'
+  | 'advice_review'
+  | 'drafting'
+  | 'legal_notice'
+  | 'filed_in_court'
+  | 'in_hearing'
+  | 'closed';
+
+// The advanceable stages an advocate can set via PUT :id/stage (excludes the terminal
+// 'closed', which is reached only through the close flow).
+export type AdvanceableStageKey = Exclude<TimelineStageKey, 'closed'>;
+
+export type ClosureOutcomeKey =
+  | 'resolved'
+  | 'settled'
+  | 'withdrawn_by_client'
+  | 'referred'
+  | 'advice_only'
+  | 'ended_early'
+  | 'dismissed_procedure'
+  | 'decided_unfavourably';
+
+export interface TimelineEvent {
+  eventId: string;
+  stageKey: TimelineStageKey;
+  note: string | null;
+  actorType: 'advocate' | 'citizen' | 'system';
+  createdAt: string;
+}
+
+export interface ConsultationClosure {
+  outcomeKey: ClosureOutcomeKey | null;
+  summary: string | null;
+  settlement?: string | null;
+  newAdvocate?: string | null;
+  nocIssued?: boolean | null;
+  nextSteps?: string | null;
+  documentsReturned: boolean;
+  feesSettled: boolean;
+  closedAt: string | null;
+  advocateName: string | null;
+  barEnrolmentNumber: string | null;
+  citizenName: string | null;
+}
+
+// GET /consultations/:id/timeline
+export interface ConsultationTimeline {
+  consultationId: string;
+  status: ConsultationStatus;
+  currentStage: TimelineStageKey;
+  closure: ConsultationClosure | null;
+  events: TimelineEvent[];
+}
+
+// Body for an advocate close (PUT /consultations/:id/close).
+export interface CloseConsultationBody {
+  outcomeKey: ClosureOutcomeKey;
+  summary: string;
+  settlement?: string;
+  newAdvocate?: string;
+  nocIssued?: boolean;
+  nextSteps?: string;
+  documentsReturned?: boolean;
+  feesSettled?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Feedback / reviews  (§5.5 / §5.6)
 // ---------------------------------------------------------------------------
 export interface FeedbackReview {

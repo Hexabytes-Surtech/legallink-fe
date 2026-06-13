@@ -22,6 +22,8 @@ export interface UseChatSocket {
   peerTyping: boolean;
   closed: boolean;
   closedBy: ClosedBy | null;
+  /** Bumps whenever the case timeline changes (stage advance / closure) — use as a refetch dep. */
+  timelineVersion: number;
   error: string | null;
   send: (text: string) => void;
   setTyping: (isTyping: boolean) => void;
@@ -47,6 +49,7 @@ export function useChatSocket(
   const [peerTyping, setPeerTyping] = React.useState(false);
   const [closed, setClosed] = React.useState(false);
   const [closedBy, setClosedBy] = React.useState<ClosedBy | null>(null);
+  const [timelineVersion, setTimelineVersion] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
 
   const socketRef = React.useRef<Socket | null>(null);
@@ -94,6 +97,12 @@ export function useChatSocket(
     socket.on('consultation_closed', (p: ClosedBy) => {
       setClosed(true);
       setClosedBy(p);
+      setTimelineVersion((v) => v + 1); // closure summary now available — refetch timeline
+    });
+
+    // Case-timeline stage advance or closure → tell the timeline panel to refetch.
+    socket.on('timeline_updated', () => {
+      setTimelineVersion((v) => v + 1);
     });
 
     socket.on('message_deleted', (data: { messageId: string }) => {
@@ -175,5 +184,5 @@ export function useChatSocket(
     socket.emit('typing', { isTyping });
   }, [closed]);
 
-  return { status, messages, historyLoaded, peerTyping, closed, closedBy, error, send, setTyping };
+  return { status, messages, historyLoaded, peerTyping, closed, closedBy, timelineVersion, error, send, setTyping };
 }
