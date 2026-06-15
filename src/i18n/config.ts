@@ -184,6 +184,13 @@ export const translations = {
     'advocates.empty': 'No advocates match these filters.',
     'advocates.availability': 'Availability',
     'advocates.about': 'About',
+    'advocates.search.placeholder': 'Search by name, practice area or district…',
+    'advocates.search.clear': 'Clear search',
+    'advocates.search.categories': 'Practice areas',
+    'advocates.search.districts': 'Districts',
+    'advocates.reset': 'Reset',
+    'advocates.count.one': 'advocate',
+    'advocates.count.many': 'advocates',
 
     // AI brief states
     'brief.processing': 'Analysing your matter…',
@@ -475,6 +482,14 @@ export const translations = {
     'adv.onb.s2': 'Bar & courts',
     'adv.onb.s3': 'Practice',
     'adv.onb.s4': 'BCI ID card',
+    'adv.onb.s1.desc': 'Your name and how clients reach you',
+    'adv.onb.s2.desc': 'Bar enrolment and the courts you practise in',
+    'adv.onb.s3.desc': 'Areas of law, languages and a short bio',
+    'adv.onb.s4.desc': 'Upload your BCI ID card for verification',
+    'adv.onb.railTitle': 'Get verified',
+    'adv.onb.railBody': 'Four quick steps. Your details stay private until an admin reviews them.',
+    'adv.onb.reassure': 'Most profiles are reviewed within about 2 working days.',
+    'adv.onb.stepOf': 'of',
 
     // Admin
     'adm.nav.overview': 'Overview',
@@ -834,6 +849,13 @@ export const translations = {
     'advocates.empty': 'এই ফিল্টারে কোনো আইনজীবী নেই।',
     'advocates.availability': 'সময়সূচি',
     'advocates.about': 'পরিচিতি',
+    'advocates.search.placeholder': 'নাম, অনুশীলনের ক্ষেত্র বা জেলা দিয়ে খুঁজুন…',
+    'advocates.search.clear': 'খালি করুন',
+    'advocates.search.categories': 'অনুশীলনের ক্ষেত্র',
+    'advocates.search.districts': 'জেলা',
+    'advocates.reset': 'রিসেট',
+    'advocates.count.one': 'আইনজীবী',
+    'advocates.count.many': 'আইনজীবী',
 
     // AI brief states
     'brief.processing': 'আপনার বিষয় বিশ্লেষণ হচ্ছে…',
@@ -1125,6 +1147,14 @@ export const translations = {
     'adv.onb.s2': 'বার ও আদালত',
     'adv.onb.s3': 'অনুশীলন',
     'adv.onb.s4': 'BCI আইডি কার্ড',
+    'adv.onb.s1.desc': 'আপনার নাম ও যোগাযোগের তথ্য',
+    'adv.onb.s2.desc': 'বার নথিভুক্তি ও আপনি যে আদালতে কাজ করেন',
+    'adv.onb.s3.desc': 'আইনের ক্ষেত্র, ভাষা ও সংক্ষিপ্ত পরিচিতি',
+    'adv.onb.s4.desc': 'যাচাইয়ের জন্য আপনার BCI পরিচয়পত্র আপলোড করুন',
+    'adv.onb.railTitle': 'যাচাইকৃত হোন',
+    'adv.onb.railBody': 'চারটি দ্রুত ধাপ। অ্যাডমিন পর্যালোচনা না করা পর্যন্ত আপনার তথ্য গোপন থাকে।',
+    'adv.onb.reassure': 'বেশিরভাগ প্রোফাইল প্রায় ২ কর্মদিবসের মধ্যে পর্যালোচনা করা হয়।',
+    'adv.onb.stepOf': '/',
 
     // Admin
     'adm.nav.overview': 'সারসংক্ষেপ',
