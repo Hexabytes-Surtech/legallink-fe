@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { LogOut, Eye, Camera, UserRound, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageToggle } from '@/components/shared/language-toggle';
 import { useAvatarUpload } from '@/hooks/useAvatarUpload';
 import { useAvatarViewer } from '@/contexts/AvatarViewerContext';
 import { usePwaInstall } from '@/contexts/PwaInstallContext';
@@ -71,6 +72,12 @@ export function HeaderAccountMenu() {
             {user.email && <p className="truncate text-xs font-normal text-muted-foreground">{user.email}</p>}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {/* The console header hides its inline language toggle on mobile to
+              avoid crowding, so surface the switch here for small screens. */}
+          <div className="flex justify-center px-2 py-1.5 sm:hidden">
+            <LanguageToggle />
+          </div>
+          <DropdownMenuSeparator className="sm:hidden" />
           <DropdownMenuItem asChild>
             <Link href={href}><UserRound /> {t('nav.viewProfile')}</Link>
           </DropdownMenuItem>

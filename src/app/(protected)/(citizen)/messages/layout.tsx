@@ -48,6 +48,8 @@ export default function CitizenMessagesLayout({ children }: { children: React.Re
           status: c.status,
           unread: c.unreadCount ?? 0,
           avatarUrl: c.advocateAvatarUrl,
+          contactId: c.advocate_id,
+          matterLabel: c.query,
         })),
     [q.data],
   );

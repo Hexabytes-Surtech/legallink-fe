@@ -36,6 +36,34 @@ function Brand() {
 }
 
 /**
+ * Sidebar navigation. On mobile the sidebar is a slide-over sheet, so selecting
+ * an item also closes it — otherwise the user lands on the new page with the
+ * sheet still covering it and has to dismiss it by hand.
+ */
+function ConsoleNav({ nav }: { nav: ConsoleNavItem[] }) {
+  const { t } = useLanguage();
+  const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenu>
+      {nav.map((item) => {
+        const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+        const Icon = item.icon;
+        return (
+          <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild isActive={active} tooltip={t(item.key)}>
+              <Link href={item.href} onClick={() => { if (isMobile) setOpenMobile(false); }}>
+                <Icon /><span>{t(item.key)}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
+}
+
+/**
  * Shared console layout built on the shadcn sidebar: a full-height collapsible sidebar
  * (brand · nav · account) plus a SidebarInset whose slim header carries the trigger and
  * the theme/language toggles. Pages render as `children` inside the inset.
@@ -49,9 +77,7 @@ export function ConsoleShell({
   brand?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const { t } = useLanguage();
   const { user } = useAuth();
-  const pathname = usePathname();
   const role = user?.role;
 
   return (
@@ -61,19 +87,7 @@ export function ConsoleShell({
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarMenu>
-              {nav.map((item) => {
-                const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={active} tooltip={t(item.key)}>
-                      <Link href={item.href}><Icon /><span>{t(item.key)}</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
+            <ConsoleNav nav={nav} />
           </SidebarGroup>
         </SidebarContent>
 
@@ -81,23 +95,43 @@ export function ConsoleShell({
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset>
+      {/* min-w-0: without it this flex child adopts the intrinsic width of wide
+          content (e.g. the advocates filter row), growing past the viewport and
+          dragging the sticky header — and its theme/avatar controls — off-screen
+          on mobile. This keeps the inset (and header) clamped to the viewport so
+          horizontal-scroll regions scroll instead of widening the page. */}
+      <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 sm:px-4">
-          <SidebarTrigger className="-ml-1" />
+          {/* Left — sidebar trigger */}
+          <div className="flex flex-1 items-center">
+            <SidebarTrigger className="-ml-1" />
+          </div>
+
+          {/* Center — equal-width side sections keep this truly centered */}
           {role && (
-            <span className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 font-display text-lg font-semibold tracking-tight sm:flex">
-              LegalLink
-              <span className="text-border">|</span>
+            <span className="flex shrink-0 items-center gap-2 font-display text-base font-semibold tracking-tight sm:text-lg">
+              {/* Full "LegalLink | role" on desktop; on mobile just the role
+                  (the language switch lives in the avatar menu there). */}
+              <span className="hidden items-center gap-2 sm:flex">
+                LegalLink
+                <span className="text-border">|</span>
+              </span>
               <span className="capitalize text-info">{role}</span>
             </span>
           )}
-          <div className="flex-1" />
-          <LanguageToggle className="hidden sm:inline-flex" />
-          <ThemeToggle />
-          <div className="mx-1 h-5 w-px bg-border" />
-          <HeaderAccountMenu />
+
+          {/* Right — language (desktop) · theme · avatar */}
+          <div className="flex flex-1 items-center justify-end gap-2">
+            <LanguageToggle className="hidden sm:inline-flex" />
+            <ThemeToggle />
+            <div className="mx-1 h-5 w-px bg-border" />
+            <HeaderAccountMenu />
+          </div>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        {/* min-w-0: stop wide page content (e.g. a horizontal-scroll filter row)
+            from forcing this column — and the sticky header above — wider than
+            the viewport, which would push the header controls off-screen. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

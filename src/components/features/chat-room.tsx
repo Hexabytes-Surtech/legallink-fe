@@ -1,10 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Send, ShieldAlert, Lock, Loader2, Clock, Paperclip, MoreVertical, XCircle, Star, Flag, Phone, Video } from 'lucide-react';
+import { Send, ShieldAlert, Lock, Loader2, Clock, Paperclip, MoreVertical, XCircle, Star, Flag, Phone, Video, PanelRightOpen, PanelRightClose, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useChatSocket } from '@/hooks';
+import { useVoiceTranscription } from '@/hooks/useVoiceTranscription';
+import { VoiceRecorderBar } from '@/components/features/voice-recorder-bar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCall } from '@/contexts/CallContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,10 +20,14 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatAttachment } from '@/components/features/chat-attachment';
 import { FeedbackDialog } from '@/components/features/feedback-dialog';
 import { ReportDialog } from '@/components/features/report-dialog';
+import { ConsultationTimeline } from '@/components/features/consultation-timeline';
 import { cn } from '@/lib/utils';
 import type { ConsultationListItem, AdvocateConsultation } from '@/types';
 
@@ -30,6 +36,10 @@ const ACCEPT_ATTACH = 'image/jpeg,image/png,image/webp,application/pdf';
 
 function initials(name: string) {
   return (name || '?').trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
+}
+// One Bengali codepoint flips the dictation language (matches the AI chat detector).
+function detectLanguage(text: string): 'en' | 'bn' {
+  return /[ঀ-৿]/.test(text) ? 'bn' : 'en';
 }
 function dayKey(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -67,9 +77,56 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   const closed = chat.closed || meta?.status === 'closed';
   const canCall = meta?.status === 'accepted' && !closed;
 
+  // Case-timeline panel: inline side panel on desktop, slide-over drawer on mobile.
+  // Collapsed by default so it never crowds the chat; the header arrow toggles it.
+  const showTimeline = meta?.status === 'accepted' || meta?.status === 'closed';
+  const [timelineDesktopOpen, setTimelineDesktopOpen] = React.useState(false);
+  const [timelineSheetOpen, setTimelineSheetOpen] = React.useState(false);
+  function toggleTimeline() {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      setTimelineDesktopOpen((o) => !o);
+    } else {
+      setTimelineSheetOpen(true);
+    }
+  }
+
   const [draft, setDraft] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const typingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Voice typing (record → Gemini transcription) ──────────────────────────
+  // Same mechanism as the AI chat: records the whole clip locally then sends it
+  // once to Gemini (FE key), so nothing is lost to network lag. The recogniser
+  // language follows what's typed, else the UI language.
+  const voiceLang: 'en' | 'bn' = detectLanguage(draft) === 'bn' || isBn ? 'bn' : 'en';
+  const {
+    supported: micSupported,
+    status: voiceStatus,
+    seconds: voiceSeconds,
+    stream: voiceStream,
+    start: startDictation,
+    stop: stopDictation,
+    cancel: cancelDictation,
+  } = useVoiceTranscription({
+    lang: voiceLang,
+    onResult: (text) => {
+      // Append the transcribed words onto whatever was already typed.
+      setDraft((prev) => prev + (prev && !/\s$/.test(prev) ? ' ' : '') + text);
+    },
+    onError: (kind) => {
+      toast.error(
+        kind === 'not-allowed' ? t('ai.voice.denied')
+          : kind === 'insecure' ? t('ai.voice.insecure')
+            : kind === 'no-mic' ? t('ai.voice.nomic')
+              : kind === 'no-key' ? t('ai.voice.nokey')
+                : kind === 'network' ? t('ai.voice.network')
+                  : kind === 'rejected' ? t('ai.voice.rejected')
+                    : kind === 'empty' ? t('ai.voice.empty')
+                      : t('ai.voice.error'),
+      );
+    },
+  });
+  const voiceActive = voiceStatus !== 'idle';
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -83,6 +140,7 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   }
   function submit(e?: React.FormEvent) {
     e?.preventDefault();
+    cancelDictation(); // discard any in-progress recording
     if (!draft.trim() || closed) return;
     chat.send(draft);
     setDraft('');
@@ -154,7 +212,9 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   }[chat.status];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full">
+      {/* Chat column */}
+      <div className="flex h-full min-w-0 flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <ViewableAvatar
@@ -172,6 +232,18 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
             {closed && <Badge variant="muted"><Lock className="size-3" /> {t('matters.consult.closed')}</Badge>}
           </span>
         </div>
+        {showTimeline && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0"
+            onClick={toggleTimeline}
+            aria-label={t('timeline.title')}
+            title={t('timeline.title')}
+          >
+            {timelineDesktopOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+          </Button>
+        )}
         {canCall && (
           <div className="flex shrink-0 items-center gap-1">
             <Button
@@ -315,33 +387,59 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
         ) : (
           <>
             <form onSubmit={submit} className="flex items-end gap-2">
-              {isCitizen && (
+              {voiceActive ? (
+                <VoiceRecorderBar
+                  status={voiceStatus}
+                  seconds={voiceSeconds}
+                  stream={voiceStream}
+                  onCancel={cancelDictation}
+                  onStop={stopDictation}
+                />
+              ) : (
                 <>
-                  <input ref={fileRef} type="file" accept={ACCEPT_ATTACH} hidden onChange={onAttachChange} />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="size-11 shrink-0"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploading || chat.status !== 'connected'}
-                    aria-label={t('chat.attachment.add')}
-                  >
-                    {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
+                  {isCitizen && (
+                    <>
+                      <input ref={fileRef} type="file" accept={ACCEPT_ATTACH} hidden onChange={onAttachChange} />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        className="size-11 shrink-0"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={uploading || chat.status !== 'connected'}
+                        aria-label={t('chat.attachment.add')}
+                      >
+                        {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
+                      </Button>
+                    </>
+                  )}
+                  <textarea
+                    value={draft}
+                    onChange={(e) => onDraftChange(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+                    rows={1}
+                    placeholder={t('chat.placeholder')}
+                    className="max-h-32 min-h-11 flex-1 resize-none rounded-xl border border-input bg-background/60 px-3.5 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                  />
+                  {micSupported && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="size-11 shrink-0"
+                      onClick={startDictation}
+                      disabled={chat.status !== 'connected'}
+                      aria-label={t('ai.voice.start')}
+                      title={t('ai.voice.start')}
+                    >
+                      <Mic className="size-4" />
+                    </Button>
+                  )}
+                  <Button type="submit" size="icon" className="size-11 shrink-0" disabled={!draft.trim() || chat.status !== 'connected'}>
+                    {chat.status === 'connecting' ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                   </Button>
                 </>
               )}
-              <textarea
-                value={draft}
-                onChange={(e) => onDraftChange(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
-                rows={1}
-                placeholder={t('chat.placeholder')}
-                className="max-h-32 min-h-11 flex-1 resize-none rounded-xl border border-input bg-background/60 px-3.5 py-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-              />
-              <Button type="submit" size="icon" className="size-11 shrink-0" disabled={!draft.trim() || chat.status !== 'connected'}>
-                {chat.status === 'connecting' ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              </Button>
             </form>
             <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
               <ShieldAlert className="size-3" /> {t('chat.safetyNote')}
@@ -365,6 +463,44 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
+
+      {/* Case timeline — desktop side panel (arrow collapses it to reclaim chat width) */}
+      {showTimeline && (
+        <aside
+          className={cn(
+            'hidden h-full shrink-0 flex-col overflow-hidden border-l border-border transition-[width] duration-300 ease-in-out lg:flex',
+            timelineDesktopOpen ? 'w-80 xl:w-96' : 'w-0',
+          )}
+          aria-hidden={!timelineDesktopOpen}
+        >
+          <div className="h-full w-80 overflow-y-auto p-4 xl:w-96">
+            <ConsultationTimeline
+              consultationId={consultationId}
+              isAdvocate={isAdvocate}
+              version={chat.timelineVersion}
+              embedded
+            />
+          </div>
+        </aside>
+      )}
+
+      {/* Case timeline — mobile slide-over drawer */}
+      {showTimeline && (
+        <Sheet open={timelineSheetOpen} onOpenChange={setTimelineSheetOpen}>
+          <SheetContent side="right" className="w-[88%] max-w-md gap-0 overflow-y-auto p-4 lg:hidden">
+            <SheetHeader className="sr-only">
+              <SheetTitle>{t('timeline.title')}</SheetTitle>
+            </SheetHeader>
+            <ConsultationTimeline
+              consultationId={consultationId}
+              isAdvocate={isAdvocate}
+              version={chat.timelineVersion}
+              embedded
+            />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

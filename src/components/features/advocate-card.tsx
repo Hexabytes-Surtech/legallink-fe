@@ -40,7 +40,7 @@ export function AdvocateCard({
   const verified = advocate.verification_status === 'verified';
 
   return (
-    <GlowCard className={cn('h-full', className)} contentClassName="flex h-full flex-col gap-4">
+    <GlowCard className={cn('h-full p-5 sm:p-6', className)} contentClassName="flex h-full flex-col gap-4">
         {/* Header */}
         <div className="flex items-start gap-3.5">
           <ViewableAvatar
@@ -102,7 +102,7 @@ export function AdvocateCard({
 
 export function AdvocateCardSkeleton() {
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-soft">
+    <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-soft sm:p-6">
       <div className="flex items-start gap-3.5">
         <Skeleton className="size-14 rounded-full" />
         <div className="flex-1 space-y-2">

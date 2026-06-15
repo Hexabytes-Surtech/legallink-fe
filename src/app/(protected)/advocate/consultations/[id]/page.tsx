@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AiBrief, AiBriefSkeleton } from '@/components/features/ai-brief';
+import { ConsultationTimeline } from '@/components/features/consultation-timeline';
 import { displayPracticeArea } from '@/components/features/advocate-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,11 @@ export default function AdvocateConsultationDetailPage() {
               <Button asChild><Link href={`/advocate/messages/${id}`}><MessageSquare className="size-4" /> {t('adv.consult.openChat')}</Link></Button>
             )}
           </div>
+
+          {/* Case timeline — advocate drives the stage + issues the closure summary */}
+          {(c.status === 'accepted' || c.status === 'closed') && (
+            <ConsultationTimeline consultationId={id} isAdvocate defaultOpen />
+          )}
 
           {/* AI brief */}
           <div>
