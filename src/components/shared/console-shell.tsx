@@ -97,6 +97,30 @@ function ConsoleNav({ nav }: { nav: ConsoleNavItem[] }) {
 }
 
 /**
+ * The hamburger trigger with a small red dot when any section has an unseen change.
+ * On mobile the whole sidebar (and its per-item dots) is a hidden sheet, so this is
+ * the only persistent on-screen hint that something updated — it complements the
+ * transient toast. Desktop keeps its always-visible per-item dots, so the trigger dot
+ * is mobile-only to avoid redundancy.
+ */
+function NavAlertTrigger({ nav }: { nav: ConsoleNavItem[] }) {
+  const { isMobile } = useSidebar();
+  const { unseen } = useRealtimeContext();
+  const anyUnseen = nav.some((item) => item.topics?.some((tp) => unseen[tp]));
+  return (
+    <span className="relative inline-flex">
+      <SidebarTrigger className="-ml-1" />
+      {isMobile && anyUnseen && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-0.5 top-0.5 size-2 rounded-full bg-red-500 ring-2 ring-background"
+        />
+      )}
+    </span>
+  );
+}
+
+/**
  * Shared console layout built on the shadcn sidebar: a full-height collapsible sidebar
  * (brand · nav · account) plus a SidebarInset whose slim header carries the trigger and
  * the theme/language toggles. Pages render as `children` inside the inset.
@@ -135,9 +159,9 @@ export function ConsoleShell({
           horizontal-scroll regions scroll instead of widening the page. */}
       <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 sm:px-4">
-          {/* Left — sidebar trigger */}
+          {/* Left — sidebar trigger (with a mobile-only "unseen change" dot) */}
           <div className="flex flex-1 items-center">
-            <SidebarTrigger className="-ml-1" />
+            <NavAlertTrigger nav={nav} />
           </div>
 
           {/* Center — equal-width side sections keep this truly centered */}

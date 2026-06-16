@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import {
-  Gavel, ChevronDown, ChevronUp, CheckCircle2, Lock, Loader2, Download,
+  Clock, ChevronDown, ChevronUp, CheckCircle2, Lock, Loader2, Download,
   ScrollText, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -237,10 +237,10 @@ export function ConsultationTimeline({
   return (
     <Card className={cn('overflow-hidden', embedded && 'border-0 bg-transparent shadow-none')}>
       {embedded ? (
-        <div className="flex items-center justify-between gap-2 pb-1">
-          <span className="flex items-center gap-2 font-semibold">
-            <Gavel className="size-4 text-primary" />
-            {t('timeline.title')}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+          <span className="flex min-w-0 items-center gap-2 font-semibold">
+            <Clock className="size-4 shrink-0 text-primary" />
+            <span className="truncate">{t('timeline.title')}</span>
           </span>
           <Badge variant={isClosed ? 'muted' : 'success'} className="shrink-0">
             {isClosed && <Lock className="size-3" />}
@@ -255,7 +255,7 @@ export function ConsultationTimeline({
           aria-expanded={open}
         >
           <span className="flex items-center gap-2 font-semibold">
-            <Gavel className="size-4 text-primary" />
+            <Clock className="size-4 text-primary" />
             {t('timeline.title')}
           </span>
           <span className="flex items-center gap-2">
@@ -302,7 +302,7 @@ export function ConsultationTimeline({
                       <p className="font-semibold leading-tight">{stageLabel(e.stageKey)}</p>
                       {!isClosedEvent && <p className="text-xs leading-snug text-muted-foreground">{stageDesc(e.stageKey)}</p>}
                       {e.note && (
-                        <p className="mt-1.5 rounded-lg bg-muted/60 px-3 py-1.5 text-sm leading-relaxed">{e.note}</p>
+                        <p className="mt-1.5 break-words rounded-lg bg-muted/60 px-3 py-1.5 text-sm leading-relaxed">{e.note}</p>
                       )}
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         {actorLabel(e.actorType)} · {fmtDate(e.createdAt, isBn)}
