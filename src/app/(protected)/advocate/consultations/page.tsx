@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { displayPracticeArea } from '@/components/features/advocate-card';
@@ -62,6 +63,8 @@ function timeAgo(iso: string | undefined, lang: string) {
 export default function AdvocateConsultationsPage() {
   const { t } = useLanguage();
   const q = useQuery<AdvocateConsultation[]>(() => api.get('/advocate/consultations'), []);
+  // Live: a new request (or a close on the other side) refreshes this list instantly.
+  useRealtime(['consultations'], () => q.refetch());
   const list = q.data ?? [];
 
   const requests = list.filter((c) => c.status === 'pending');

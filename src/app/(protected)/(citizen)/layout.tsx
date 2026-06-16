@@ -16,7 +16,9 @@ const NAV: ConsoleNavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, key: 'citizen.nav.dashboard', exact: true },
   { href: '/ask', icon: Sparkles, key: 'citizen.nav.askAi' },
   { href: '/matters', icon: FolderOpen, key: 'citizen.nav.matters' },
-  { href: '/messages', icon: MessagesSquare, key: 'citizen.nav.messages' },
+  // A consultation being accepted/declined surfaces in Messages (accepted chats live
+  // here), so both new messages and consultation-status changes badge this item.
+  { href: '/messages', icon: MessagesSquare, key: 'citizen.nav.messages', topics: ['messages', 'consultations'] },
   { href: '/advocates', icon: Scale, key: 'citizen.nav.advocates' },
   { href: '/profile', icon: UserRound, key: 'citizen.nav.profile' },
 ];

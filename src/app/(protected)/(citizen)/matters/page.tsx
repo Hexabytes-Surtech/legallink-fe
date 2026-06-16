@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { FileText, MessageSquare, Star, CalendarClock, XCircle, Plus, CheckCircle2, Loader2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +66,8 @@ export default function MattersPage() {
   }
 
   const refresh = () => { mattersQ.refetch(); consultsQ.refetch(); };
+  // Live: consultation status changes reflect here without a manual refresh.
+  useRealtime(['consultations'], () => consultsQ.refetch());
   const loading = mattersQ.loading && matters.length === 0;
 
   const rows = matters.map((m) => ({ matter: m, consult: consultByMatter.get(m.matterId) }));

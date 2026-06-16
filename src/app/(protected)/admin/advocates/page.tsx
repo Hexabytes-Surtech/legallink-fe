@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { BadgeCheck, Check, X, FileText, ExternalLink, Loader2, Mail, Phone, MapPin } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,8 @@ type Tr = (k: TranslationKey) => string;
 export default function AdminVerificationPage() {
   const { t } = useLanguage();
   const q = useQuery<PendingAdvocate[]>(() => api.get('/admin/advocates/pending'), []);
+  // Live: a new submission (or another admin acting) refreshes the queue instantly.
+  useRealtime(['admin-advocates'], () => q.refetch());
   const list = q.data ?? [];
 
   return (

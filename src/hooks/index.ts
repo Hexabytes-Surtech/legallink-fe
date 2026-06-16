@@ -7,6 +7,8 @@ export { useChatSocket } from './useChatSocket';
 export type { ChatStatus, ChatMessage, UseChatSocket } from './useChatSocket';
 export { useNotificationsSocket } from './useNotificationsSocket';
 export type { UnreadBump } from './useNotificationsSocket';
+export { useRealtime, useRealtimeContext } from '@/contexts/RealtimeContext';
+export type { RealtimeTopic } from '@/contexts/RealtimeContext';
 export { useSpeechRecognition } from './useSpeechRecognition';
 export type {
   UseSpeechRecognition,
