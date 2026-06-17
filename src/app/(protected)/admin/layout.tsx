@@ -12,9 +12,9 @@ import { AppSkeleton } from '@/components/shared/app-skeleton';
 
 const NAV: ConsoleNavItem[] = [
   { href: '/admin', icon: LayoutDashboard, key: 'adm.nav.overview', exact: true },
-  { href: '/admin/advocates', icon: BadgeCheck, key: 'adm.nav.verification' },
-  { href: '/admin/messages', icon: ShieldAlert, key: 'adm.nav.moderation' },
-  { href: '/admin/reports', icon: Flag, key: 'adm.nav.reports' },
+  { href: '/admin/advocates', icon: BadgeCheck, key: 'adm.nav.verification', topics: ['admin-advocates'] },
+  { href: '/admin/messages', icon: ShieldAlert, key: 'adm.nav.moderation', topics: ['admin-moderation'] },
+  { href: '/admin/reports', icon: Flag, key: 'adm.nav.reports', topics: ['admin-reports'] },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
-import { useAuth, useNotificationsSocket } from '@/hooks';
+import { useRealtime } from '@/hooks';
 import { MessagesShell, type MessageConvo } from '@/components/features/messages-shell';
 import type { ConsultationListItem } from '@/types';
 
@@ -12,12 +12,12 @@ const BASE = '/messages';
 
 export default function CitizenMessagesLayout({ children }: { children: React.ReactNode }) {
   const q = useQuery<ConsultationListItem[]>(() => api.get('/consultations'), []);
-  const { accessToken } = useAuth();
   const pathname = usePathname();
   const activeId = pathname.startsWith(`${BASE}/`) ? pathname.slice(BASE.length + 1).split('/')[0] : undefined;
 
-  // Live: a new advocate message anywhere → refetch so the badge ticks up instantly.
-  useNotificationsSocket(accessToken, () => q.refetch());
+  // Live: a new advocate message OR a consultation status change → refetch so the
+  // list + badges stay current (shared /notify connection via RealtimeProvider).
+  useRealtime(['messages', 'consultations'], () => q.refetch());
 
   // Opening a conversation marks it read (GET advances citizen_last_read_at), then we
   // refetch the list so its numeric badge clears.

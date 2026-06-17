@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ConsoleShell, type ConsoleNavItem } from '@/components/shared/console-shell';
@@ -17,8 +18,8 @@ import type { AdvocateSelf } from '@/types';
 
 const NAV: ConsoleNavItem[] = [
   { href: '/advocate/dashboard', icon: LayoutDashboard, key: 'adv.nav.dashboard', exact: true },
-  { href: '/advocate/consultations', icon: Inbox, key: 'adv.nav.consultations' },
-  { href: '/advocate/messages', icon: MessagesSquare, key: 'adv.nav.messages' },
+  { href: '/advocate/consultations', icon: Inbox, key: 'adv.nav.consultations', topics: ['consultations'] },
+  { href: '/advocate/messages', icon: MessagesSquare, key: 'adv.nav.messages', topics: ['messages'] },
   { href: '/advocate/availability', icon: CalendarClock, key: 'adv.nav.availability' },
   { href: '/advocate/reviews', icon: Star, key: 'adv.nav.reviews' },
   { href: '/advocate/profile', icon: UserCog, key: 'adv.nav.profile' },
@@ -37,6 +38,8 @@ export default function AdvocateLayout({ children }: { children: React.ReactNode
   }, [user, router]);
 
   const meQ = useQuery<AdvocateSelf>(() => api.get('/advocate/me'), [pathname], { enabled: isAdvocate });
+  // Live: an admin verifying/rejecting flips the verification banner/badge instantly.
+  useRealtime(['verification'], () => meQ.refetch());
   const me = meQ.data;
   const onOnboarding = pathname === '/advocate/onboarding';
 

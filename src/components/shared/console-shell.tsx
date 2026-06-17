@@ -13,6 +13,7 @@ import { LanguageToggle } from '@/components/shared/language-toggle';
 import { HeaderAccountMenu } from '@/components/shared/header-account-menu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealtimeContext, type RealtimeTopic } from '@/contexts/RealtimeContext';
 import type { TranslationKey } from '@/i18n/config';
 import type { LucideIcon } from 'lucide-react';
 
@@ -22,6 +23,12 @@ export interface ConsoleNavItem {
   key: TranslationKey;
   /** Active only on an exact path match (e.g. dashboard roots). Default: prefix match. */
   exact?: boolean;
+  /**
+   * Realtime topics that light up this item's "unseen change" dot. The dot shows when
+   * any listed topic has a change the user hasn't looked at yet, and clears the moment
+   * they open this section.
+   */
+  topics?: RealtimeTopic[];
 }
 
 /** LegalLink wordmark that collapses to just the mark in icon mode. */
@@ -44,11 +51,31 @@ function ConsoleNav({ nav }: { nav: ConsoleNavItem[] }) {
   const { t } = useLanguage();
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { unseen, setActiveTopics } = useRealtimeContext();
+
+  // Topics belonging to the section currently on screen — these stay un-badged while
+  // the user is looking at them (and clear the instant they navigate in).
+  const activeKey = React.useMemo(() => {
+    const set = new Set<RealtimeTopic>();
+    for (const item of nav) {
+      const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+      if (active) item.topics?.forEach((tp) => set.add(tp));
+    }
+    return Array.from(set).join(',');
+  }, [nav, pathname]);
+
+  React.useEffect(() => {
+    setActiveTopics(activeKey ? (activeKey.split(',') as RealtimeTopic[]) : []);
+  }, [activeKey, setActiveTopics]);
+
   return (
     <SidebarMenu>
       {nav.map((item) => {
         const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
         const Icon = item.icon;
+        // A red dot when this section has an unseen change — never on the section the
+        // user is already viewing.
+        const showDot = !active && !!item.topics?.some((tp) => unseen[tp]);
         return (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton asChild isActive={active} tooltip={t(item.key)}>
@@ -56,10 +83,40 @@ function ConsoleNav({ nav }: { nav: ConsoleNavItem[] }) {
                 <Icon /><span>{t(item.key)}</span>
               </Link>
             </SidebarMenuButton>
+            {showDot && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute right-2 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-sidebar"
+              />
+            )}
           </SidebarMenuItem>
         );
       })}
     </SidebarMenu>
+  );
+}
+
+/**
+ * The hamburger trigger with a small red dot when any section has an unseen change.
+ * On mobile the whole sidebar (and its per-item dots) is a hidden sheet, so this is
+ * the only persistent on-screen hint that something updated — it complements the
+ * transient toast. Desktop keeps its always-visible per-item dots, so the trigger dot
+ * is mobile-only to avoid redundancy.
+ */
+function NavAlertTrigger({ nav }: { nav: ConsoleNavItem[] }) {
+  const { isMobile } = useSidebar();
+  const { unseen } = useRealtimeContext();
+  const anyUnseen = nav.some((item) => item.topics?.some((tp) => unseen[tp]));
+  return (
+    <span className="relative inline-flex">
+      <SidebarTrigger className="-ml-1" />
+      {isMobile && anyUnseen && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-0.5 top-0.5 size-2 rounded-full bg-red-500 ring-2 ring-background"
+        />
+      )}
+    </span>
   );
 }
 
@@ -102,9 +159,9 @@ export function ConsoleShell({
           horizontal-scroll regions scroll instead of widening the page. */}
       <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 sm:px-4">
-          {/* Left — sidebar trigger */}
+          {/* Left — sidebar trigger (with a mobile-only "unseen change" dot) */}
           <div className="flex flex-1 items-center">
-            <SidebarTrigger className="-ml-1" />
+            <NavAlertTrigger nav={nav} />
           </div>
 
           {/* Center — equal-width side sections keep this truly centered */}

@@ -27,7 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChatAttachment } from '@/components/features/chat-attachment';
 import { FeedbackDialog } from '@/components/features/feedback-dialog';
 import { ReportDialog } from '@/components/features/report-dialog';
-import { ConsultationTimeline } from '@/components/features/consultation-timeline';
+import { ChatSidePanel } from '@/components/features/chat-side-panel';
 import { cn } from '@/lib/utils';
 import type { ConsultationListItem, AdvocateConsultation } from '@/types';
 
@@ -66,16 +66,33 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
   const meta = React.useMemo(() => {
     if (isAdvocate) {
       const c = (advocateQ.data ?? []).find((x) => x.id === consultationId);
-      return c ? { name: c.citizen_name || 'Citizen', status: c.status, hasFeedback: false, reported: !!c.reported, avatarUrl: c.citizen_avatar_url ?? null } : null;
+      return c ? { name: c.citizen_name || 'Citizen', status: c.status, hasFeedback: false, reported: !!c.reported, avatarUrl: c.citizen_avatar_url ?? null, matterId: c.matter_id ?? null } : null;
     }
     const c = (citizenQ.data ?? []).find((x) => x.consultationId === consultationId);
-    return c ? { name: c.advocateName || 'Advocate', status: c.status, hasFeedback: !!c.hasFeedback, reported: false, avatarUrl: c.advocateAvatarUrl ?? null } : null;
+    return c ? { name: c.advocateName || 'Advocate', status: c.status, hasFeedback: !!c.hasFeedback, reported: false, avatarUrl: c.advocateAvatarUrl ?? null, matterId: c.matter_id ?? null } : null;
   }, [isAdvocate, advocateQ.data, citizenQ.data, consultationId]);
 
   const chat = useChatSocket(consultationId, accessToken, { id: user?.userId, type: selfType });
   const call = useCall();
   const closed = chat.closed || meta?.status === 'closed';
   const canCall = meta?.status === 'accepted' && !closed;
+
+  // Files shared inside the chat thread (paperclip uploads), normalised for the
+  // Matter tab's consolidated file list. The chat already holds every message, so this
+  // needs no extra fetch. attachmentType 'image'|'pdf' → a mime-ish string the viewer
+  // understands.
+  const chatAttachments = React.useMemo(
+    () =>
+      chat.messages
+        .filter((m) => m.attachmentUrl && !m.deleted)
+        .map((m, i) => ({
+          id: m.messageId,
+          url: m.attachmentUrl as string,
+          fileType: m.attachmentType === 'image' ? 'image/*' : 'application/pdf',
+          name: m.attachmentName ?? `${t('chat.panel.document')} ${i + 1}`,
+        })),
+    [chat.messages, t],
+  );
 
   // Case-timeline panel: inline side panel on desktop, slide-over drawer on mobile.
   // Collapsed by default so it never crowds the chat; the header arrow toggles it.
@@ -238,8 +255,8 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
             size="icon"
             className="size-9 shrink-0"
             onClick={toggleTimeline}
-            aria-label={t('timeline.title')}
-            title={t('timeline.title')}
+            aria-label={t('chat.panel.title')}
+            title={t('chat.panel.title')}
           >
             {timelineDesktopOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
           </Button>
@@ -470,16 +487,18 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
         <aside
           className={cn(
             'hidden h-full shrink-0 flex-col overflow-hidden border-l border-border transition-[width] duration-300 ease-in-out lg:flex',
-            timelineDesktopOpen ? 'w-80 xl:w-96' : 'w-0',
+            timelineDesktopOpen ? 'w-[26rem] xl:w-[32rem] 2xl:w-[36rem]' : 'w-0',
           )}
           aria-hidden={!timelineDesktopOpen}
         >
-          <div className="h-full w-80 overflow-y-auto p-4 xl:w-96">
-            <ConsultationTimeline
+          <div className="h-full w-[26rem] overflow-y-auto p-4 xl:w-[32rem] 2xl:w-[36rem]">
+            <ChatSidePanel
               consultationId={consultationId}
               isAdvocate={isAdvocate}
-              version={chat.timelineVersion}
-              embedded
+              matterId={meta?.matterId}
+              chatAttachments={chatAttachments}
+              timelineVersion={chat.timelineVersion}
+              open={timelineDesktopOpen}
             />
           </div>
         </aside>
@@ -488,15 +507,17 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
       {/* Case timeline — mobile slide-over drawer */}
       {showTimeline && (
         <Sheet open={timelineSheetOpen} onOpenChange={setTimelineSheetOpen}>
-          <SheetContent side="right" className="w-[88%] max-w-md gap-0 overflow-y-auto p-4 lg:hidden">
+          <SheetContent side="right" className="w-[92%] max-w-lg gap-0 overflow-y-auto p-4 lg:hidden">
             <SheetHeader className="sr-only">
-              <SheetTitle>{t('timeline.title')}</SheetTitle>
+              <SheetTitle>{t('chat.panel.title')}</SheetTitle>
             </SheetHeader>
-            <ConsultationTimeline
+            <ChatSidePanel
               consultationId={consultationId}
               isAdvocate={isAdvocate}
-              version={chat.timelineVersion}
-              embedded
+              matterId={meta?.matterId}
+              chatAttachments={chatAttachments}
+              timelineVersion={chat.timelineVersion}
+              open
             />
           </SheetContent>
         </Sheet>

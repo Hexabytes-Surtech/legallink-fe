@@ -662,6 +662,29 @@ export const translations = {
     'report.submit': 'Submit report',
     'report.success': 'Report submitted to admin',
     'report.alreadyReported': 'You have already reported this citizen',
+
+    // Realtime toasts (shown on live updates — esp. mobile, where the sidebar badge is hidden)
+    'rt.toast.consultation_requested': 'New consultation request',
+    'rt.toast.consultation_accepted': 'Your consultation was accepted',
+    'rt.toast.consultation_declined': 'Your consultation was declined',
+    'rt.toast.consultation_closed': 'A consultation was closed',
+    'rt.toast.verification_approved': 'Your account has been verified',
+    'rt.toast.verification_rejected': 'Your verification needs attention',
+    'rt.toast.advocate_submitted': 'New advocate awaiting verification',
+    'rt.toast.report_filed': 'A new report was filed',
+    'rt.toast.message': 'New message',
+    'rt.toast.tapToView': 'Tap to view',
+
+    // Chat right-side panel (Matter + Case timeline tabs)
+    'chat.panel.title': 'Case details',
+    'chat.panel.matter': 'Matter',
+    'chat.panel.vault': 'Document Vault',
+    'chat.panel.timeline': 'Timeline',
+    'chat.panel.documents': 'Documents',
+    'chat.panel.noDocuments': 'No documents uploaded',
+    'chat.panel.document': 'Document',
+    'chat.panel.matterDocs': 'Matter documents',
+    'chat.panel.chatFiles': 'Shared in chat',
   },
 
   bn: {
@@ -1327,6 +1350,29 @@ export const translations = {
     'report.submit': 'রিপোর্ট জমা দিন',
     'report.success': 'অ্যাডমিনের কাছে রিপোর্ট জমা হয়েছে',
     'report.alreadyReported': 'আপনি ইতিমধ্যে এই নাগরিকের বিরুদ্ধে রিপোর্ট করেছেন',
+
+    // Realtime toasts (shown on live updates — esp. mobile, where the sidebar badge is hidden)
+    'rt.toast.consultation_requested': 'নতুন পরামর্শের অনুরোধ',
+    'rt.toast.consultation_accepted': 'আপনার পরামর্শ গৃহীত হয়েছে',
+    'rt.toast.consultation_declined': 'আপনার পরামর্শ প্রত্যাখ্যাত হয়েছে',
+    'rt.toast.consultation_closed': 'একটি পরামর্শ বন্ধ হয়েছে',
+    'rt.toast.verification_approved': 'আপনার অ্যাকাউন্ট যাচাই করা হয়েছে',
+    'rt.toast.verification_rejected': 'আপনার যাচাইকরণে মনোযোগ প্রয়োজন',
+    'rt.toast.advocate_submitted': 'নতুন আইনজীবী যাচাইয়ের অপেক্ষায়',
+    'rt.toast.report_filed': 'একটি নতুন রিপোর্ট দাখিল হয়েছে',
+    'rt.toast.message': 'নতুন বার্তা',
+    'rt.toast.tapToView': 'দেখতে ট্যাপ করুন',
+
+    // Chat right-side panel (Matter + Case timeline tabs)
+    'chat.panel.title': 'কেসের বিবরণ',
+    'chat.panel.matter': 'বিষয়',
+    'chat.panel.vault': 'নথি ভল্ট',
+    'chat.panel.timeline': 'টাইমলাইন',
+    'chat.panel.documents': 'নথিপত্র',
+    'chat.panel.noDocuments': 'কোনো নথি আপলোড করা হয়নি',
+    'chat.panel.document': 'নথি',
+    'chat.panel.matterDocs': 'বিষয়ের নথি',
+    'chat.panel.chatFiles': 'চ্যাটে শেয়ার করা',
   },
 } as const;
 

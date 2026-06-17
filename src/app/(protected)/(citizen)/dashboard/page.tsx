@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FolderOpen, Clock, Mail, Plus, Scale, ArrowRight, MessageSquare, Sparkles, MessagesSquare } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,9 @@ export default function CitizenDashboardPage() {
 
   const mattersQ = useQuery<MatterListItem[] | { matters: MatterListItem[] }>(() => api.get('/matter'), []);
   const consultsQ = useQuery<ConsultationListItem[]>(() => api.get('/consultations'), []);
+
+  // Live: an advocate accepting/declining/closing updates the status cards instantly.
+  useRealtime(['consultations'], () => consultsQ.refetch());
 
   const matters = React.useMemo(() => {
     const d = mattersQ.data;

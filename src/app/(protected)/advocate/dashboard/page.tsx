@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Inbox, CheckCircle2, Archive, Users, Star, ShieldAlert, ArrowRight, FileText } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +27,8 @@ export default function AdvocateDashboardPage() {
   const { user } = useAuth();
   const q = useQuery<AdvocateDashboard>(() => api.get('/advocate/dashboard'), []);
   const docsQ = useQuery<AdvocateDoc[]>(() => api.get('/advocate/documents'), []);
+  // Live: pending/active counts + verification status update without a refresh.
+  useRealtime(['consultations', 'verification'], () => q.refetch());
   const d = q.data;
   const docs = docsQ.data ?? [];
   const avatarName = user?.name || 'Advocate';

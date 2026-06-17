@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ShieldCheck, Check, X, Loader2, MessageSquareWarning } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ export default function AdminModerationPage() {
   const { t, language } = useLanguage();
   const isBn = language === 'bn';
   const q = useQuery<FlaggedMessage[]>(() => api.get('/admin/messages/flagged'), []);
+  // Live: the queue shrinks the moment any admin clears/dismisses a flagged message.
+  useRealtime(['admin-moderation'], () => q.refetch());
   const list = q.data ?? [];
 
   return (

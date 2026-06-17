@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Flag, Check, X, Loader2, ShieldCheck, User } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery, useMutation } from '@/hooks/useApi';
+import { useRealtime } from '@/hooks';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ export default function AdminReportsPage() {
   const { t, language } = useLanguage();
   const isBn = language === 'bn';
   const q = useQuery<CitizenReport[]>(() => api.get('/admin/reports'), []);
+  // Live: a freshly filed report (or another admin resolving one) refreshes the queue.
+  useRealtime(['admin-reports'], () => q.refetch());
   const list = q.data ?? [];
 
   return (
