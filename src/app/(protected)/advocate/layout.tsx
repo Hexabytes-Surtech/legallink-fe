@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Inbox, MessagesSquare, CalendarClock, UserCog, Star, Rocket,
+  LayoutDashboard, Inbox, MessagesSquare, CalendarClock, UserCog, Star, Rocket, CreditCard,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
@@ -21,6 +21,7 @@ const NAV: ConsoleNavItem[] = [
   { href: '/advocate/consultations', icon: Inbox, key: 'adv.nav.consultations', topics: ['consultations'] },
   { href: '/advocate/messages', icon: MessagesSquare, key: 'adv.nav.messages', topics: ['messages'] },
   { href: '/advocate/availability', icon: CalendarClock, key: 'adv.nav.availability' },
+  { href: '/advocate/billing', icon: CreditCard, key: 'adv.nav.billing' },
   { href: '/advocate/reviews', icon: Star, key: 'adv.nav.reviews' },
   { href: '/advocate/profile', icon: UserCog, key: 'adv.nav.profile' },
   { href: '/advocate/onboarding', icon: Rocket, key: 'adv.nav.onboarding' },

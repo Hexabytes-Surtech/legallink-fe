@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { translations, type TranslationKey } from '@/i18n/config';
 import type { MatterDetail, Classification } from '@/types';
 import { cn } from '@/lib/utils';
+import { Markdown, MarkdownInline } from '@/lib/markdown';
 
 // tiny local translator to avoid prop-drilling `t`
 function tr(key: TranslationKey, isBn: boolean): string {
@@ -191,11 +192,7 @@ export function AiBrief({ matter }: { matter: MatterDetail }) {
 
 function Prose({ text, className }: { text: string | null; className?: string }) {
   if (!text) return <p className="text-sm text-muted-foreground">—</p>;
-  return (
-    <div className={cn('space-y-3 text-sm leading-relaxed text-foreground/90', className)}>
-      {text.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}
-    </div>
-  );
+  return <Markdown text={text} className={cn('space-y-3', className)} />;
 }
 
 function StepCard({ icon, title, items }: { icon: React.ReactNode; title: string; items: string[] }) {
@@ -212,7 +209,7 @@ function StepCard({ icon, title, items }: { icon: React.ReactNode; title: string
           {items.map((it, i) => (
             <li key={i} className="flex gap-3 text-sm leading-relaxed">
               <span className="grid size-5 shrink-0 place-items-center rounded-full bg-gold/15 text-[11px] font-bold text-gold">{i + 1}</span>
-              <span className="text-foreground/90">{it}</span>
+              <span className="text-foreground/90"><MarkdownInline text={it} /></span>
             </li>
           ))}
         </ol>
