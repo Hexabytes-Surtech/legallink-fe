@@ -172,6 +172,63 @@ export const api = {
 };
 
 /**
+ * SSE streaming POST. Parses `event:`/`data:` blocks and calls `onEvent(event, data)`
+ * for each. Resolves when the stream ends; throws ApiError on a non-OK response.
+ * Sends the Bearer token + session cookie just like the rest of the client.
+ * Used by the Perplexity-style chat (agent steps + sources + streamed answer).
+ */
+export async function streamPost(
+  path: string,
+  body: unknown,
+  onEvent: (event: string, data: Record<string, unknown>) => void,
+  opts: { signal?: AbortSignal } = {},
+): Promise<void> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(body),
+    signal: opts.signal,
+  });
+
+  if (!res.ok || !res.body) {
+    const json = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, extractError(json, res.status));
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buf.indexOf('\n\n')) !== -1) {
+      const block = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      let event = 'message';
+      let data = '';
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) data += line.slice(5).trim();
+      }
+      if (data) {
+        try {
+          onEvent(event, JSON.parse(data));
+        } catch {
+          /* ignore malformed event */
+        }
+      }
+    }
+  }
+}
+
+/**
  * Legacy result-shape wrapper — never throws. Returns a discriminated result.
  * Useful where you want to render an inline error without a try/catch.
  */

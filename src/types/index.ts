@@ -493,14 +493,24 @@ export interface OnboardingPayload {
 // ── AI conversational assistant (multi-turn triage chat) ──────────────────────
 export type AiChatPhase = 'triage' | 'gathering' | 'ready' | 'closed';
 
+/** A dial-able emergency/helpline number surfaced in immediate-help mode. */
+export interface EmergencyContact {
+  label: string;
+  number: string;
+}
+
 /** One assistant turn — returned by POST /ai/conversation and /:id/message. */
 export interface AiTurn {
   conversationId: string;
   phase: AiChatPhase;
   isLegalProblem: boolean | null;
+  responseMode?: 'normal' | 'immediate_help';
   assistantReply: string;
   followUpQuestion: string;
   suggestedSteps: string[];
+  emergencyContacts?: EmergencyContact[];
+  safetyConcern?: boolean;
+  urgencyLevel?: 'low' | 'medium' | 'high';
   readyToConnect: boolean;
   matterId: string | null;
 }

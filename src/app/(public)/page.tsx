@@ -51,9 +51,13 @@ export default function LandingPage() {
     }
   }, [isLoading, isAuthenticated, user, router]);
 
-  // While the session is restoring, or while we redirect an authed user away,
-  // hold the public marketing content back to avoid a flash of the wrong UI.
-  if (isLoading || isAuthenticated) {
+  // SEO: the public marketing copy (H1, headings, links) MUST be in the
+  // server-rendered HTML, or crawlers see a blank spinner — 0 words, no H1, no
+  // internal links (exactly what the audit flagged). So we only hold content
+  // back once we *positively* know the visitor is signed in and are redirecting
+  // them away. During the brief session-restore window `isAuthenticated` is
+  // still false, so anonymous visitors and crawlers get the full page at once.
+  if (isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner className="size-7" />

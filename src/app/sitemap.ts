@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.in';
+const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.hexabytes.tech';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [

@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import { Loader2, Save, CalendarClock } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, Save, CalendarClock, Lock } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { useQuery } from '@/hooks/useApi';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -27,6 +28,8 @@ export default function AvailabilityPage() {
   const { t, language } = useLanguage();
   const isBn = language === 'bn';
   const q = useQuery<AvailabilityRule[]>(() => api.get('/advocate/availability'), []);
+  // The scheduling calendar is gated behind the advocate SaaS subscription (BE returns 402).
+  const locked = q.error instanceof ApiError && q.error.code === 402;
   const [days, setDays] = React.useState<DayState[]>(defaults());
   const [saving, setSaving] = React.useState(false);
 
@@ -73,7 +76,19 @@ export default function AvailabilityPage() {
       </h1>
       <p className="mt-1 text-muted-foreground">{t('adv.avail.subtitle')}</p>
 
-      {q.loading && !q.data ? (
+      {locked ? (
+        <Card className="mt-6 border-gold/40 bg-gold/5">
+          <CardContent className="flex flex-col items-start gap-3 py-6">
+            <p className="flex items-center gap-2 font-medium">
+              <Lock className="size-5 text-gold" /> {t('adv.avail.locked.title')}
+            </p>
+            <p className="text-sm text-muted-foreground">{t('adv.avail.locked.body')}</p>
+            <Button asChild className="mt-1">
+              <Link href="/advocate/billing">{t('adv.avail.locked.cta')}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : q.loading && !q.data ? (
         <Skeleton className="mt-6 h-96 w-full rounded-xl" />
       ) : (
         <Card className="mt-6">

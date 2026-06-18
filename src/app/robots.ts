@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/admin/', '/advocate/', '/advocates/', '/messages/', '/ask/', '/matter/', '/matters/', '/dashboard/', '/profile/', '/settings/'],
       },
     ],
-    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.in'}/sitemap.xml`,
+    sitemap: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://legallink.hexabytes.tech'}/sitemap.xml`,
   };
 }
