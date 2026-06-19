@@ -62,6 +62,34 @@ function setToken(token: string) {
   if (typeof window !== 'undefined') localStorage.setItem(LS_ACCESS, token);
 }
 
+// Anonymous-session id, carried in the X-Anon-Session header so it survives even when
+// the cross-site `legallink_session` cookie is blocked — notably in incognito, which
+// drops third-party cookies. localStorage is first-party to the FE, so it persists.
+const LS_ANON_SESSION = 'legallink_anon_session';
+const ANON_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function newUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function getAnonSessionId(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    let id = localStorage.getItem(LS_ANON_SESSION);
+    if (!id || !ANON_UUID_RE.test(id)) {
+      id = newUuid();
+      localStorage.setItem(LS_ANON_SESSION, id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
+}
+
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = `${BASE_URL}${path}`;
   if (!query) return url;
@@ -127,6 +155,10 @@ async function coreFetch<T>(path: string, options: RequestOptions, isRetry = fal
     if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
   }
 
+  // Anon-session header (incognito-safe; backs up the cross-site cookie).
+  const anon = getAnonSessionId();
+  if (anon) finalHeaders['X-Anon-Session'] = anon;
+
   const init: RequestInit = { method, headers: finalHeaders, credentials: 'include', signal };
   if (formData) init.body = formData;
   else if (body !== undefined) init.body = JSON.stringify(body);
@@ -186,6 +218,8 @@ export async function streamPost(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  const anon = getAnonSessionId();
+  if (anon) headers['X-Anon-Session'] = anon;
 
   const res = await fetch(buildUrl(path), {
     method: 'POST',
