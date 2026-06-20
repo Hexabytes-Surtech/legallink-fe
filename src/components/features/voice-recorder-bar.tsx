@@ -20,7 +20,7 @@ type AudioCtor = typeof AudioContext;
  * re-render per frame). This is the recognisable "I'm listening" visual that
  * ChatGPT / Claude show while dictating, so the recording state is unambiguous.
  */
-function Waveform({ stream, bars = 28 }: { stream: MediaStream | null; bars?: number }) {
+export function Waveform({ stream, bars = 28 }: { stream: MediaStream | null; bars?: number }) {
   const refs = React.useRef<(HTMLSpanElement | null)[]>([]);
 
   React.useEffect(() => {
