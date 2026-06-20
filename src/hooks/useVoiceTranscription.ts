@@ -74,22 +74,22 @@ export function useVoiceTranscription(
     setStatus(s);
   }, []);
 
-  // Capability check after mount (SSR renders no button; a capable, configured
-  // client reveals it). Gated on the FE Gemini key so it stays hidden until set.
+  // Capability check after mount — show the button on any browser that can
+  // record audio. If the Gemini key is missing, start() surfaces a 'no-key'
+  // error toast rather than hiding the button entirely.
   React.useEffect(() => {
     const capable =
       typeof navigator !== 'undefined' &&
       !!navigator.mediaDevices?.getUserMedia &&
       typeof window !== 'undefined' &&
       typeof window.MediaRecorder !== 'undefined';
-    const hasKey = !!getSttConfig().apiKey;
-    if (capable && !hasKey) {
+    if (capable && !getSttConfig().apiKey) {
       console.warn(
-        '[voice] mic hidden — set NEXT_PUBLIC_GEMINI_API_KEY in legallink-fe/.env (or .env.local) to enable Gemini voice typing',
+        '[voice] NEXT_PUBLIC_GEMINI_API_KEY not set — voice button visible but transcription will fail until key is added',
       );
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot capability read
-    setSupported(capable && hasKey);
+    setSupported(capable);
   }, []);
 
   const teardown = React.useCallback(() => {
