@@ -703,8 +703,11 @@ function AssistantBubble({ msg, t }: { msg: AssistantMsg; t: (k: TranslationKey)
             {showTrail && <ProcessTrail msg={msg} t={t} />}
 
             {/* Retrieved law, as numbered source chips (the focused rights block
-                replaces this generic panel in immediate-help mode). */}
-            {msg.sources.length > 0 && !msg.immediate && <SourcesPanel sources={msg.sources} t={t} />}
+                replaces this generic panel in immediate-help mode).
+                Only shown when the reply actually cites at least one source — prevents
+                generic RAG results from appearing on greeting / off-topic turns where
+                Gemini correctly responds without citing anything. */}
+            {msg.sources.length > 0 && !msg.immediate && /\[\d+\]/.test(msg.text) && <SourcesPanel sources={msg.sources} t={t} />}
 
             {/* Answer prose (streams in word-by-word) */}
             {msg.pending && !hasAnswer ? (
