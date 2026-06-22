@@ -4,15 +4,15 @@ import * as React from 'react';
 import {
   transcribeAudio,
   pickRecorderMime,
-  getSttConfig,
   type SttLang,
   type SttError,
 } from '@/lib/gemini-stt';
 
 // Record-then-transcribe voice typing. Unlike the live Web Speech API (which
 // streams every word to Google and drops words on a slow link), this captures
-// the WHOLE clip locally, then sends it once to Gemini. Reliable on poor
-// connections; the trade-off is it's tap-to-record, not live.
+// the WHOLE clip locally, then sends it once to the LegalLink backend which
+// proxies to Gemini. Reliable on poor connections; the trade-off is it's
+// tap-to-record, not live.
 
 export type VoiceStatus = 'idle' | 'recording' | 'transcribing';
 
@@ -20,9 +20,8 @@ export type VoiceErrorKind =
   | 'not-allowed' // mic permission denied
   | 'no-mic' // no microphone / capture failed
   | 'insecure' // page not on https/localhost
-  | 'no-key' // NEXT_PUBLIC_GEMINI_API_KEY missing
-  | 'network' // couldn't reach Gemini
-  | 'rejected' // Gemini errored (bad key, quota…)
+  | 'network' // couldn't reach the backend
+  | 'rejected' // backend / Gemini errored (quota, unavailable…)
   | 'empty' // nothing intelligible captured
   | 'unknown';
 
@@ -35,7 +34,7 @@ export interface UseVoiceTranscriptionOptions {
 }
 
 export interface UseVoiceTranscription {
-  /** True only when the browser can record AND a Gemini key is configured. */
+  /** True when the browser can record audio. */
   supported: boolean;
   status: VoiceStatus;
   /** Elapsed recording seconds (for the timer display). */
@@ -74,20 +73,13 @@ export function useVoiceTranscription(
     setStatus(s);
   }, []);
 
-  // Capability check after mount — show the button on any browser that can
-  // record audio. If the Gemini key is missing, start() surfaces a 'no-key'
-  // error toast rather than hiding the button entirely.
+  // Capability check after mount — show the button on any browser that can record audio.
   React.useEffect(() => {
     const capable =
       typeof navigator !== 'undefined' &&
       !!navigator.mediaDevices?.getUserMedia &&
       typeof window !== 'undefined' &&
       typeof window.MediaRecorder !== 'undefined';
-    if (capable && !getSttConfig().apiKey) {
-      console.warn(
-        '[voice] NEXT_PUBLIC_GEMINI_API_KEY not set — voice button visible but transcription will fail until key is added',
-      );
-    }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot capability read
     setSupported(capable);
   }, []);
@@ -148,10 +140,6 @@ export function useVoiceTranscription(
     if (statusRef.current !== 'idle') return;
     if (typeof window !== 'undefined' && !window.isSecureContext) {
       optsRef.current.onError?.('insecure');
-      return;
-    }
-    if (!getSttConfig().apiKey) {
-      optsRef.current.onError?.('no-key');
       return;
     }
 

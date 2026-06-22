@@ -1,25 +1,18 @@
-// Browser-side Gemini speech-to-text.
+// Browser-side speech-to-text — proxied through the LegalLink backend.
 //
-// The frontend calls the Gemini REST API DIRECTLY with its own key
-// (NEXT_PUBLIC_GEMINI_API_KEY) so the NestJS backend stays untouched and
-// unburdened. Audio is recorded locally, converted to 16 kHz mono WAV (a
-// Gemini-supported format) and sent in ONE request — no live streaming, so
-// nothing is lost to network lag or silence-driven restarts (the failure mode
-// of the browser Web Speech API). Only needs to reach the Gemini API endpoint,
-// not Google's separate speech service.
+// Audio is recorded locally, converted to 16 kHz mono WAV, and POSTed to
+// POST /api/ai/transcribe (our NestJS backend). The backend holds the Gemini
+// API key and handles the model-fallback chain (2.5-flash-lite → gemini-3).
+// No NEXT_PUBLIC_GEMINI_API_KEY is needed or used in the browser.
 
-const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Current, multimodal (accepts audio), and the most generous free-tier limits
-// (30 RPM / 1,000 RPD / 1M TPM). gemini-2.0-flash is being shut down — avoid it.
-const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+import { api } from '@/lib/api/client';
 
 export type SttLang = 'en' | 'bn';
 
 export type SttErrorKind =
-  | 'no-key' // NEXT_PUBLIC_GEMINI_API_KEY not set
-  | 'network' // request never reached Gemini (offline / blocked / CORS)
-  | 'rejected' // Gemini answered with an error (bad key, quota, 4xx/5xx)
-  | 'empty' // transcription came back blank
+  | 'network'  // request never reached the backend (offline / CORS)
+  | 'rejected' // backend returned an error (Gemini unavailable, quota, etc.)
+  | 'empty'    // transcription came back blank
   | 'unknown';
 
 export interface SttError extends Error {
@@ -30,12 +23,6 @@ function sttError(kind: SttErrorKind, message: string): SttError {
   const e = new Error(message) as SttError;
   e.kind = kind;
   return e;
-}
-
-export function getSttConfig(): { apiKey: string | undefined; model: string } {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY?.trim() || undefined;
-  const model = process.env.NEXT_PUBLIC_GEMINI_STT_MODEL?.trim() || DEFAULT_MODEL;
-  return { apiKey, model };
 }
 
 /** A MediaRecorder mime the current browser actually supports, or undefined. */
@@ -146,74 +133,28 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-interface GeminiResponse {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
-  promptFeedback?: { blockReason?: string };
-}
-
-function cleanTranscript(raw: string): string {
-  let s = raw.trim();
-  // The model is told to output bare text, but strip a stray wrapping quote or
-  // a "Transcription:" label just in case it adds one.
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith('“') && s.endsWith('”'))) {
-    s = s.slice(1, -1).trim();
-  }
-  s = s.replace(/^(?:transcription|transcript)\s*:\s*/i, '');
-  return s;
-}
-
 /**
- * Transcribe a recorded audio blob via Gemini and return the plain text.
+ * Transcribe a recorded audio blob by sending it to the LegalLink backend,
+ * which proxies the request to Gemini (2.5-flash-lite, with gemini-3 fallback).
  * Throws an {@link SttError} (with a `kind`) on any failure.
  */
 export async function transcribeAudio(blob: Blob, lang: SttLang): Promise<string> {
-  const { apiKey, model } = getSttConfig();
-  if (!apiKey) throw sttError('no-key', 'NEXT_PUBLIC_GEMINI_API_KEY is not set');
-
   const wav = await blobToWav(blob);
-  const base64 = await blobToBase64(wav);
+  const audio = await blobToBase64(wav);
 
-  const langName = lang === 'bn' ? 'Bengali (output in Bengali/Bangla script)' : 'English';
-  const prompt =
-    `You are a precise speech-to-text engine. Transcribe the spoken audio verbatim in ${langName}. ` +
-    `Output ONLY the exact transcription text — no quotes, no preamble, no notes, no translation, no markdown. ` +
-    `If the audio is silent or unintelligible, output nothing at all.`;
-
-  let res: Response;
+  let result: { text: string };
   try {
-    res = await fetch(
-      `${API_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            { parts: [{ text: prompt }, { inline_data: { mime_type: 'audio/wav', data: base64 } }] },
-          ],
-          generationConfig: { temperature: 0, maxOutputTokens: 2048 },
-        }),
-      },
-    );
+    result = await api.post<{ text: string }>('/ai/transcribe', { audio, lang });
   } catch (err) {
-    throw sttError('network', `Gemini request failed to send: ${(err as Error).message}`);
+    const msg = (err as Error).message ?? '';
+    // ApiError (4xx/5xx from our BE) or network failure
+    if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror')) {
+      throw sttError('network', `Transcription request failed: ${msg}`);
+    }
+    throw sttError('rejected', `Transcription error: ${msg}`);
   }
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw sttError('rejected', `Gemini HTTP ${res.status}: ${body.slice(0, 300)}`);
-  }
-
-  let data: GeminiResponse;
-  try {
-    data = (await res.json()) as GeminiResponse;
-  } catch {
-    throw sttError('unknown', 'Gemini returned a non-JSON response');
-  }
-
-  const text = (data.candidates?.[0]?.content?.parts ?? [])
-    .map((p) => p.text ?? '')
-    .join('')
-    .trim();
-
-  return cleanTranscript(text);
+  const text = (result?.text ?? '').trim();
+  if (!text) throw sttError('empty', 'No speech detected');
+  return text;
 }

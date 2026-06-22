@@ -135,11 +135,10 @@ export function ChatRoom({ consultationId }: { consultationId: string }) {
         kind === 'not-allowed' ? t('ai.voice.denied')
           : kind === 'insecure' ? t('ai.voice.insecure')
             : kind === 'no-mic' ? t('ai.voice.nomic')
-              : kind === 'no-key' ? t('ai.voice.nokey')
-                : kind === 'network' ? t('ai.voice.network')
-                  : kind === 'rejected' ? t('ai.voice.rejected')
-                    : kind === 'empty' ? t('ai.voice.empty')
-                      : t('ai.voice.error'),
+              : kind === 'network' ? t('ai.voice.network')
+                : kind === 'rejected' ? t('ai.voice.rejected')
+                  : kind === 'empty' ? t('ai.voice.empty')
+                    : t('ai.voice.error'),
       );
     },
   });
