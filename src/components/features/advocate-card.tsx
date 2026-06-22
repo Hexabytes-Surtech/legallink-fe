@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MapPin, Languages as LangIcon, BadgeCheck } from 'lucide-react';
+import { MapPin, Languages as LangIcon, BadgeCheck, Sparkles } from 'lucide-react';
 import { GlowCard } from '@/components/aceternity/glow-card';
 import { AvatarFallback } from '@/components/ui/avatar';
 import { ViewableAvatar } from '@/components/shared/viewable-avatar';
@@ -75,6 +75,21 @@ export function AdvocateCard({
           <div className="flex flex-wrap gap-1.5">
             {uniquePracticeAreaLabels(practiceAreas).slice(0, 5).map((label) => (
               <Badge key={label} variant="gold">{label}</Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Match reasons */}
+        {advocate.matchReasons && advocate.matchReasons.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {advocate.matchReasons.map((reason) => (
+              <span
+                key={reason}
+                className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success"
+              >
+                <Sparkles className="size-2.5 shrink-0" />
+                {reason}
+              </span>
             ))}
           </div>
         )}

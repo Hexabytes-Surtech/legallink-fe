@@ -183,6 +183,7 @@ export interface AdvocateCardData {
   avatar_url: string | null;
   rating: number | null;
   rating_count: number;
+  matchReasons?: string[];
 }
 
 export interface AdvocateDirectoryResponse {
